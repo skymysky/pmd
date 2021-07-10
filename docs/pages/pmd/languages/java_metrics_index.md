@@ -1,6 +1,6 @@
 ---
 title:  Index of Java code metrics
-tags: [customizing]
+tags: [extending, metrics]
 summary: "Index of the code metrics available out of the box to Java rule developers."
 last_updated: July 20, 2017
 permalink: pmd_java_metrics_index.html
@@ -23,6 +23,115 @@ it uses instead of the services they provide.
  
 ATFD can be used to detect God Classes and Feature Envy. \[[Lanza05](#Lanza05)\]
 
+## Class Fan Out Complexity (CLASS_FAN_OUT)
+
+*Operation metric, class metric.* Can be computed on classes, enums and 
+concrete operations.
+
+### Description
+This counts the number of other classes a given class or operation relies on.
+Classes from the package `java.lang` are ignored by default (can be changed via options).
+Also primitives are not included into the count.
+
+### Code example
+
+```java
+import java.util.*;
+import java.io.IOException;
+
+public class Foo { // total 8
+    public Set set = new HashSet(); // +2
+    public Map map = new HashMap(); // +2
+    public String string = ""; // from java.lang -> does not count by default
+    public Double number = 0.0; // from java.lang -> does not count by default
+    public int[] intArray = new int[3]; // primitive -> does not count
+
+    @Deprecated // from java.lang -> does not count by default
+    @Override // from java.lang -> does not count by default
+    public void foo(List list) throws Exception { // +1 (Exception is from java.lang)
+        throw new IOException(); // +1
+    }
+
+    public int getMapSize() {
+        return map.size(); // +1 because it uses the Class from the 'map' field
+    }   
+}
+```
+
+### Options
+
+* Option `includeJavaLang`: Also include classes from the package `java.lang`
+
+## Cognitive Complexity (COGNITIVE_COMPLEXITY)
+
+*Operation metric.* Can be calculated on any non-abstract operation.
+
+### Description
+
+Cognitive complexity is a measure of how difficult it is for humans to read and understand a method. Code that contains
+a break in the control flow is more complex, whereas the use of language shorthands doesn't increase the level of
+complexity. Nested control flows can make a method more difficult to understand, with each additional nesting of the
+control flow leading to an increase in cognitive complexity.
+
+Information about Cognitive complexity can be found in the original paper here:
+[CognitiveComplexity](https://www.sonarsource.com/docs/CognitiveComplexity.pdf)
+
+The rule {% rule java/design/CognitiveComplexity %} by default reports methods with a complexity of 15 or more. 
+These reported methods should be broken down into less
+complex components.
+
+### Basic Idea
+
+1. Ignore structures that allow multiple statements to be readably shorthanded into one
+2. Increment (add one) for each break in the linear flow of the code
+3. Increment when flow-breaking structures are nested
+
+### Increments
+There is an increment for each of the following:
+* `if`, `else if`, `else`, ternary operator
+* `switch`
+* `for`, `foreach`
+* `while`, `do while`
+* `catch`
+* `goto LABEL`, `break LABEL`, `continue LABEL`
+* sequences of binary logical operators
+* each method in a recursion cycle
+
+### Nesting level
+The following structures increment the nesting level:
+* `if`, `else if`, `else`, ternary operator
+* `switch`
+* `for`, `foreach`
+* `while`, `do while`
+* `catch`
+* nested methods and method-like structures such as lambdas
+
+### Nesting increments
+The following structures receive a nesting increment commensurate with their nested depth
+inside nested structures:
+* `if`, ternary operator
+* `switch`
+* `for`, `foreach`
+* `while`, `do while`
+* `catch`
+
+### Code example
+
+```java
+class Foo {
+  void myMethod () {
+    try {
+      if (condition1) { // +1
+        for (int i = 0; i < 10; i++) { // +2 (nesting=1)
+          while (condition2) { } // +3 (nesting=2)
+        }
+      }
+    } catch (ExcepType1 | ExcepType2 e) { // +1
+      if (condition2) { } // +2 (nesting=1)
+    }
+  } // Cognitive Complexity 9
+}
+```
 
 ## Cyclomatic Complexity (CYCLO) 
 

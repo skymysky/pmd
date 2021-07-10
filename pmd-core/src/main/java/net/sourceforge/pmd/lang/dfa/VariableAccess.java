@@ -7,7 +7,9 @@ package net.sourceforge.pmd.lang.dfa;
 /**
  * @since Created on 14.07.2004
  * @author raik
+ * @deprecated See {@link DataFlowNode}
  */
+@Deprecated
 public class VariableAccess {
 
     public static final int DEFINITION = 0;
@@ -51,13 +53,13 @@ public class VariableAccess {
     @Override
     public String toString() {
         if (isDefinition()) {
-            return "Definition(" + variableName + ")";
+            return "Definition(" + variableName + ')';
         }
         if (isReference()) {
-            return "Reference(" + variableName + ")";
+            return "Reference(" + variableName + ')';
         }
         if (isUndefinition()) {
-            return "Undefinition(" + variableName + ")";
+            return "Undefinition(" + variableName + ')';
         }
         throw new RuntimeException("Access type was never set");
     }

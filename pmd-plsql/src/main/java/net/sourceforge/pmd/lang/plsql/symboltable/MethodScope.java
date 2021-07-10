@@ -72,9 +72,10 @@ public class MethodScope extends AbstractScope {
     }
 
     public String getName() {
-        return ((AbstractPLSQLNode) node.jjtGetChild(1)).getCanonicalImage();
+        return ((AbstractPLSQLNode) node.getChild(1)).getCanonicalImage();
     }
 
+    @Override
     public String toString() {
         return "MethodScope:" + getVariableDeclarations().keySet();
     }

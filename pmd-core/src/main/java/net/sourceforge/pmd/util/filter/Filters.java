@@ -10,11 +10,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import net.sourceforge.pmd.annotation.InternalApi;
+
 /**
  * Utility class for working with Filters. Contains builder style methods, apply
  * methods, as well as mechanisms for adapting Filters and FilenameFilters.
+ *
+ * @deprecated Internal API, see {@link Filter}
  */
-public class Filters {
+@Deprecated
+@InternalApi
+public final class Filters {
 
     private Filters() { }
 

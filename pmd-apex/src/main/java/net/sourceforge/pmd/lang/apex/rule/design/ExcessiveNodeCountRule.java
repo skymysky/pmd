@@ -38,9 +38,8 @@ public class ExcessiveNodeCountRule extends AbstractStatisticalApexRule {
     public Object visit(ApexNode<?> node, Object data) {
         int numNodes = 0;
 
-        for (int i = 0; i < node.jjtGetNumChildren(); i++) {
-            Integer treeSize = (Integer) ((ApexNode<?>) node.jjtGetChild(i)).jjtAccept(this, data);
-            numNodes += treeSize;
+        for (ApexNode<?> child : node.children()) {
+            numNodes += (Integer) child.jjtAccept(this, data);
         }
 
         if (nodeClass.isInstance(node)) {

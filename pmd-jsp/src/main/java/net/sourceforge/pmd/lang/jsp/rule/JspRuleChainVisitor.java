@@ -14,14 +14,22 @@ import net.sourceforge.pmd.lang.jsp.ast.JspNode;
 import net.sourceforge.pmd.lang.jsp.ast.JspParserVisitor;
 import net.sourceforge.pmd.lang.jsp.ast.JspParserVisitorAdapter;
 import net.sourceforge.pmd.lang.rule.AbstractRuleChainVisitor;
+import net.sourceforge.pmd.lang.rule.RuleChainVisitor;
 import net.sourceforge.pmd.lang.rule.XPathRule;
 
+/**
+ * @deprecated for removal with PMD 7. A language dependent rule chain visitor is not needed anymore.
+ *      See {@link RuleChainVisitor}.
+ */
+@Deprecated
 public class JspRuleChainVisitor extends AbstractRuleChainVisitor {
 
+    @Override
     protected void indexNodes(List<Node> nodes, RuleContext ctx) {
         JspParserVisitor jspParserVisitor = new JspParserVisitorAdapter() {
             // Perform a visitation of the AST to index nodes which need
             // visiting by type
+            @Override
             public Object visit(JspNode node, Object data) {
                 indexNode(node);
                 return super.visit(node, data);
@@ -33,6 +41,7 @@ public class JspRuleChainVisitor extends AbstractRuleChainVisitor {
         }
     }
 
+    @Override
     protected void visit(Rule rule, Node node, RuleContext ctx) {
         // Rule better either be a JspParserVisitor, or a XPathRule
         if (rule instanceof JspParserVisitor) {

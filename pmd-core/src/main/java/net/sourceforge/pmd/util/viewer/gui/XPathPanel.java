@@ -5,7 +5,6 @@
 package net.sourceforge.pmd.util.viewer.gui;
 
 import java.awt.Dimension;
-
 import javax.swing.BorderFactory;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
@@ -60,7 +59,7 @@ public class XPathPanel extends JTabbedPane implements ViewerModelListener {
     public void viewerModelChanged(ViewerModelEvent e) {
         switch (e.getReason()) {
         case ViewerModelEvent.PATH_EXPRESSION_APPENDED:
-            if (e.getSource() != this) {
+            if (!e.getSource().equals(this)) {
                 xPathArea.append((String) e.getParameter());
             }
             setSelectedIndex(0);

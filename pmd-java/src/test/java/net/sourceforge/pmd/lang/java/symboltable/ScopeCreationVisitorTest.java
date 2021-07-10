@@ -9,14 +9,17 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 import net.sourceforge.pmd.PMD;
+import net.sourceforge.pmd.lang.java.ast.ASTBlock;
+import net.sourceforge.pmd.lang.java.ast.ASTCompilationUnit;
 import net.sourceforge.pmd.lang.java.ast.ASTIfStatement;
 
-public class ScopeCreationVisitorTest extends STBBaseTst {
+public class ScopeCreationVisitorTest extends BaseNonParserTest {
 
     @Test
     public void testScopesAreCreated() {
-        parseCode(TEST1);
-        ASTIfStatement n = acu.findDescendantsOfType(ASTIfStatement.class).get(0);
+        ASTCompilationUnit acu = parseCode(TEST1);
+        ASTBlock n = acu.getFirstDescendantOfType(ASTIfStatement.class)
+                .getFirstDescendantOfType(ASTBlock.class);
         assertTrue(n.getScope() instanceof LocalScope);
     }
 

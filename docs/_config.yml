@@ -1,8 +1,12 @@
 repository: pmd/pmd
 
 pmd:
-    version: 6.1.0-SNAPSHOT
-    date: 2018
+    version: 6.37.0-SNAPSHOT
+    previous_version: 6.36.0
+    date: 31-July-2021
+    release_type: minor
+
+# release types: major, minor, bugfix
 
 output: web
 # this property is useful for conditional filtering of content that is separate from the PDF.
@@ -28,10 +32,21 @@ host: 127.0.0.1
 port: 4005
 # the port where the preview is rendered. You can leave this as is unless you have other Jekyll builds using this same port that might cause conflicts. in that case, use another port such as 4006.
 
+# these are the files and directories that jekyll will exclude from the build
 exclude:
   - .idea/
   - .gitignore
-# these are the files and directories that jekyll will exclude from the build
+  - vendor/
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - Dockerfile
+  - build-docs.sh
+  - pdf-*.sh
+  - pdfconfigs/
+  - pdf/
+  - sitemap_generator.sh
+  - render_release_notes.rb
 
 feedback_subject_line: PMD Source Code Analyzer
 
@@ -103,5 +118,9 @@ description: "Intended as a documentation theme based on Jekyll for technical wr
 # the description is used in the feed.xml file
 
 # needed for sitemap.xml file only
-url: http://pmd.sourceforge.net
+url: https://pmd.github.io/pmd
 baseurl: ""
+
+# used by javadoc_tag.rb
+# https://javadoc.io/page/net.sourceforge.pmd
+javadoc_url_prefix: https://docs.pmd-code.org/apidocs

@@ -10,12 +10,14 @@ import java.lang.reflect.Constructor;
 import org.objectweb.asm.signature.SignatureReader;
 
 import net.sourceforge.pmd.dcd.ClassLoaderUtil;
+import net.sourceforge.pmd.dcd.DCD;
 import net.sourceforge.pmd.dcd.asm.TypeSignatureVisitor;
 
 /**
  * Represents a Class Constructor in a UsageGraph.
+ * @deprecated See {@link DCD}
  */
-@SuppressWarnings("PMD.OverrideBothEqualsAndHashcode")
+@Deprecated
 public class ConstructorNode extends MemberNode<ConstructorNode, Constructor<?>> {
 
     private WeakReference<Constructor<?>> constructorReference;
@@ -79,22 +81,5 @@ public class ConstructorNode extends MemberNode<ConstructorNode, Constructor<?>>
             }
         }
         return cmp;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof ConstructorNode) {
-            ConstructorNode that = (ConstructorNode) obj;
-            return super.equals(that);
-        }
-        return false;
-    }
-
-    /* (non-Javadoc)
-     * @see net.sourceforge.pmd.dcd.graph.MemberNode#hashCode()
-     */
-    @Override
-    public int hashCode() {
-        return super.hashCode();
     }
 }

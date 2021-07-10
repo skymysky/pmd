@@ -1,4 +1,4 @@
-/**
+/*
  * BSD-style license; for more info see http://pmd.sourceforge.net/license.html
  */
 
@@ -9,22 +9,26 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.lang.java.ast.ASTEqualityExpression;
 import net.sourceforge.pmd.lang.java.ast.ASTLiteral;
-import net.sourceforge.pmd.lang.java.ast.ASTPrimitiveType;
 import net.sourceforge.pmd.lang.java.ast.ASTRelationalExpression;
 import net.sourceforge.pmd.lang.java.ast.ASTVariableDeclaratorId;
 import net.sourceforge.pmd.lang.java.symboltable.JavaNameOccurrence;
+import net.sourceforge.pmd.lang.java.symboltable.VariableNameDeclaration;
 import net.sourceforge.pmd.lang.symboltable.NameOccurrence;
 
 /**
  * This is an abstract rule for patterns which compare a method invocation to 0.
  * It could be further abstracted to find code that compares something to
  * another definable pattern
- * 
+ *
  * @author acaplan
+ * @deprecated Internal API
  */
+@Deprecated
+@InternalApi
 public abstract class AbstractInefficientZeroCheck extends AbstractJavaRule {
 
     private static Map<String, String> inverse = new HashMap<>();
@@ -35,7 +39,7 @@ public abstract class AbstractInefficientZeroCheck extends AbstractJavaRule {
 
     /**
      * For each relation/equality operator, comparison targets need to define.
-     * 
+     *
      * @return map
      */
     public Map<String, List<String>> getComparisonTargets() {
@@ -58,9 +62,9 @@ public abstract class AbstractInefficientZeroCheck extends AbstractJavaRule {
 
     @Override
     public Object visit(ASTVariableDeclaratorId node, Object data) {
-        Node nameNode = node.getTypeNameNode();
-        if (nameNode == null || nameNode instanceof ASTPrimitiveType
-                || !appliesToClassName(node.getNameDeclaration().getTypeImage())) {
+        VariableNameDeclaration varDecl = node.getNameDeclaration();
+        if (varDecl == null || varDecl.getType() == null
+                || !appliesToClassName(varDecl.getType().getName())) {
             return data;
         }
 
@@ -70,7 +74,7 @@ public abstract class AbstractInefficientZeroCheck extends AbstractJavaRule {
             if (!isTargetMethod(jocc)) {
                 continue;
             }
-            Node expr = jocc.getLocation().jjtGetParent().jjtGetParent().jjtGetParent();
+            Node expr = jocc.getLocation().getParent().getParent().getParent();
             checkNodeAndReport(data, jocc.getLocation(), expr);
         }
         return data;
@@ -79,7 +83,7 @@ public abstract class AbstractInefficientZeroCheck extends AbstractJavaRule {
     /**
      * Checks whether the given expression is a equality/relation expression
      * that compares with a size() call.
-     * 
+     *
      * @param data
      *            the rule context
      * @param location
@@ -98,7 +102,7 @@ public abstract class AbstractInefficientZeroCheck extends AbstractJavaRule {
     /**
      * We only need to report if this is comparing against one of the comparison
      * targets
-     * 
+     *
      * @param equality
      * @return true if this is comparing to one of the comparison targets else
      *         false
@@ -122,15 +126,15 @@ public abstract class AbstractInefficientZeroCheck extends AbstractJavaRule {
     }
 
     private boolean isLiteral(Node equality, int child) {
-        Node target = equality.jjtGetChild(child);
+        Node target = equality.getChild(child);
         target = getFirstChildOrThis(target);
         target = getFirstChildOrThis(target);
         return target instanceof ASTLiteral;
     }
 
     private Node getFirstChildOrThis(Node node) {
-        if (node.jjtGetNumChildren() > 0) {
-            return node.jjtGetChild(0);
+        if (node.getNumChildren() > 0) {
+            return node.getChild(0);
         }
         return node;
     }
@@ -138,7 +142,7 @@ public abstract class AbstractInefficientZeroCheck extends AbstractJavaRule {
     /**
      * Checks if the equality expression passed in is of comparing against the
      * value passed in as i
-     * 
+     *
      * @param equality
      * @param i
      *            The ordinal in the equality expression to check
@@ -147,7 +151,7 @@ public abstract class AbstractInefficientZeroCheck extends AbstractJavaRule {
      * @see #getComparisonTargets()
      */
     private boolean checkComparison(String operator, Node equality, int i) {
-        Node target = equality.jjtGetChild(i).jjtGetChild(0).jjtGetChild(0);
+        Node target = equality.getChild(i).getChild(0).getChild(0);
         return target instanceof ASTLiteral && getComparisonTargets().get(operator).contains(target.getImage());
     }
 

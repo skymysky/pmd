@@ -17,7 +17,7 @@ package net.sourceforge.pmd.lang.vm.directive;
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
- * under the License.    
+ * under the License.
  */
 
 /**
@@ -26,7 +26,9 @@ package net.sourceforge.pmd.lang.vm.directive;
  * @author <a href="mailto:jvanzyl@apache.org">Jason van Zyl</a>
  * @author Nathan Bubna
  * @version $Id: Directive.java 778045 2009-05-23 22:17:46Z nbubna $
+ * @deprecated for removal in PMD 7.0.0
  */
+@Deprecated
 public abstract class Directive implements Cloneable {
     /** Block directive indicator */
     public static final int BLOCK = 1;
@@ -41,21 +43,21 @@ public abstract class Directive implements Cloneable {
 
     /**
      * Return the name of this directive.
-     * 
+     *
      * @return The name of this directive.
      */
     public abstract String getName();
 
     /**
      * Get the directive type BLOCK/LINE.
-     * 
+     *
      * @return The directive type BLOCK/LINE.
      */
     public abstract int getType();
 
     /**
      * Allows the template location to be set.
-     * 
+     *
      * @param line
      * @param column
      */
@@ -66,7 +68,7 @@ public abstract class Directive implements Cloneable {
 
     /**
      * Allows the template location to be set.
-     * 
+     *
      * @param line
      * @param column
      */
@@ -77,7 +79,7 @@ public abstract class Directive implements Cloneable {
 
     /**
      * for log msg purposes
-     * 
+     *
      * @return The current line for log msg purposes.
      */
     public int getLine() {
@@ -86,7 +88,7 @@ public abstract class Directive implements Cloneable {
 
     /**
      * for log msg purposes
-     * 
+     *
      * @return The current column for log msg purposes.
      */
     public int getColumn() {

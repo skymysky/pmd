@@ -8,12 +8,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import net.sourceforge.pmd.RuleContext;
 import net.sourceforge.pmd.lang.java.ast.ASTAllocationExpression;
 import net.sourceforge.pmd.lang.java.ast.ASTAssignmentOperator;
 import net.sourceforge.pmd.lang.java.ast.ASTBlock;
+import net.sourceforge.pmd.lang.java.ast.ASTCastExpression;
 import net.sourceforge.pmd.lang.java.ast.ASTForStatement;
 import net.sourceforge.pmd.lang.java.ast.ASTLiteral;
 import net.sourceforge.pmd.lang.java.ast.ASTMethodDeclaration;
@@ -23,6 +25,7 @@ import net.sourceforge.pmd.lang.java.ast.ASTPrimaryPrefix;
 import net.sourceforge.pmd.lang.java.ast.ASTPrimarySuffix;
 import net.sourceforge.pmd.lang.java.ast.ASTVariableDeclarator;
 import net.sourceforge.pmd.lang.java.ast.ASTVariableDeclaratorId;
+import net.sourceforge.pmd.lang.java.ast.JavaNode;
 import net.sourceforge.pmd.lang.java.rule.AbstractJavaRule;
 import net.sourceforge.pmd.lang.java.symboltable.ClassScope;
 import net.sourceforge.pmd.lang.java.symboltable.LocalScope;
@@ -53,6 +56,10 @@ public class LawOfDemeterRule extends AbstractJavaRule {
     private static final String REASON_METHOD_CHAIN_CALLS = "method chain calls";
     private static final String REASON_OBJECT_NOT_CREATED_LOCALLY = "object not created locally";
     private static final String REASON_STATIC_ACCESS = "static property access";
+
+    public LawOfDemeterRule() {
+        addRuleChainVisit(ASTMethodDeclaration.class);
+    }
 
     /**
      * That's a new method. We are going to check each method call inside the
@@ -138,19 +145,46 @@ public class LawOfDemeterRule extends AbstractJavaRule {
             List<MethodCall> result = new ArrayList<>();
 
             if (isNotAConstructorCall(expression) && isNotLiteral(expression) && hasSuffixesWithArguments(expression)) {
-                ASTPrimaryPrefix prefixNode = expression.getFirstDescendantOfType(ASTPrimaryPrefix.class);
-                MethodCall firstMethodCallInChain = new MethodCall(expression, prefixNode);
-                result.add(firstMethodCallInChain);
+                ASTPrimaryPrefix prefixNode = expression.getFirstChildOfType(ASTPrimaryPrefix.class);
+                ASTPrimarySuffix followingSuffix = getFollowingSuffix(prefixNode);
+                boolean firstExpressionIsMethodCall = followingSuffix != null && followingSuffix.isArguments();
+                MethodCall firstMethodCallInChain = null;
 
-                if (firstMethodCallInChain.isNotBuilder()) {
+                if (firstExpressionIsMethodCall) {
+                    firstMethodCallInChain = new MethodCall(expression, prefixNode);
+                    result.add(firstMethodCallInChain);
+                }
+
+                if (firstMethodCallInChain == null || firstMethodCallInChain.isNotBuilder()) {
                     List<ASTPrimarySuffix> suffixes = findSuffixesWithoutArguments(expression);
                     for (ASTPrimarySuffix suffix : suffixes) {
-                        result.add(new MethodCall(expression, suffix));
+                        if (!expression.hasDescendantOfType(ASTCastExpression.class)) {
+                            result.add(new MethodCall(expression, suffix));
+                        }
                     }
                 }
             }
 
+            // when method chaining is detected, it must consist of multiple method calls
+            if (result.size() == 1) {
+                MethodCall m = result.get(0);
+                if (m.isViolation() && SCOPE_METHOD_CHAINING.equals(m.baseScope)) {
+                    result.clear();
+                }
+            }
+
             return result;
+        }
+
+        private static ASTPrimarySuffix getFollowingSuffix(JavaNode node) {
+            int current = node.getIndexInParent();
+            if (node.getParent().getNumChildren() > current + 1) {
+                JavaNode following = node.getParent().getChild(current + 1);
+                if (following instanceof ASTPrimarySuffix) {
+                    return (ASTPrimarySuffix) following;
+                }
+            }
+            return null;
         }
 
         private static boolean isNotAConstructorCall(ASTPrimaryExpression expression) {
@@ -167,15 +201,16 @@ public class LawOfDemeterRule extends AbstractJavaRule {
 
         private boolean isNotBuilder() {
             return baseType != StringBuffer.class && baseType != StringBuilder.class
-                    && !"StringBuilder".equals(baseTypeName) && !"StringBuffer".equals(baseTypeName);
+                    && !"StringBuilder".equals(baseTypeName) && !"StringBuffer".equals(baseTypeName)
+                    && !methodName.endsWith("Builder");
         }
 
         private static List<ASTPrimarySuffix> findSuffixesWithoutArguments(ASTPrimaryExpression expr) {
             List<ASTPrimarySuffix> result = new ArrayList<>();
             if (hasRealPrefix(expr)) {
-                List<ASTPrimarySuffix> suffixes = expr.findDescendantsOfType(ASTPrimarySuffix.class);
+                List<ASTPrimarySuffix> suffixes = expr.findChildrenOfType(ASTPrimarySuffix.class);
                 for (ASTPrimarySuffix suffix : suffixes) {
-                    if (!suffix.isArguments()) {
+                    if (!suffix.isArguments() && !suffix.isArrayDereference()) {
                         result.add(suffix);
                     }
                 }
@@ -341,17 +376,17 @@ public class LawOfDemeterRule extends AbstractJavaRule {
             List<ASTAssignmentOperator> assignmentStmts = block.findDescendantsOfType(ASTAssignmentOperator.class);
             for (ASTAssignmentOperator stmt : assignmentStmts) {
                 //we only care about it if it occurs prior to (or on) the beginLine of the current expression
-                //and if it is a simple_assignement_operator
+                //and if it is a simple_assignment_operator
                 if (stmt.getBeginLine() <= expression.getBeginLine()
                         && stmt.hasImageEqualTo(SIMPLE_ASSIGNMENT_OPERATOR)) {
                     //now we need to make sure it has the right image name
-                    ASTPrimaryPrefix primaryPrefix = stmt.jjtGetParent()
+                    ASTPrimaryPrefix primaryPrefix = stmt.getParent()
                             .getFirstDescendantOfType(ASTPrimaryPrefix.class);
                     if (primaryPrefix != null) {
                         ASTName prefixName = primaryPrefix.getFirstChildOfType(ASTName.class);
                         if (prefixName != null && prefixName.hasImageEqualTo(baseName)) {
                             //this is an assignment related to the baseName we are working with
-                            boolean allocationFound = stmt.jjtGetParent()
+                            boolean allocationFound = stmt.getParent()
                                     .getFirstDescendantOfType(ASTAllocationExpression.class) != null;
                             boolean iterator = isIterator();
                             assignments
@@ -383,7 +418,7 @@ public class LawOfDemeterRule extends AbstractJavaRule {
             boolean factory = false;
             List<ASTName> names = declarator.findDescendantsOfType(ASTName.class);
             for (ASTName name : names) {
-                if (name.getImage().toLowerCase().contains("factory")) {
+                if (name.getImage().toLowerCase(Locale.ROOT).contains("factory")) {
                     factory = true;
                     break;
                 }
@@ -392,7 +427,7 @@ public class LawOfDemeterRule extends AbstractJavaRule {
         }
 
         private boolean isForLoop(ASTVariableDeclarator declarator) {
-            return declarator.jjtGetParent().jjtGetParent() instanceof ASTForStatement;
+            return declarator.getParent().getParent() instanceof ASTForStatement;
         }
 
         public ASTPrimaryExpression getExpression() {
@@ -440,6 +475,7 @@ public class LawOfDemeterRule extends AbstractJavaRule {
                     + forLoop;
         }
 
+        @Override
         public int compareTo(Assignment o) {
             return o.line - line;
         }

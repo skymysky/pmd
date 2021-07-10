@@ -4,40 +4,38 @@
 
 package net.sourceforge.pmd.lang.java.metrics;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import net.sourceforge.pmd.lang.java.ast.ASTAnyTypeBodyDeclaration;
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.java.ast.ASTAnyTypeDeclaration;
-import net.sourceforge.pmd.lang.java.ast.ASTMethodOrConstructorDeclaration;
+import net.sourceforge.pmd.lang.java.ast.MethodLikeNode;
 import net.sourceforge.pmd.lang.metrics.AbstractMetricsComputer;
+import net.sourceforge.pmd.lang.metrics.MetricsComputer;
 
 /**
  * Computes a metric.
  *
  * @author Clément Fournier
+ * @deprecated See {@link MetricsComputer}
  */
-public class JavaMetricsComputer extends AbstractMetricsComputer<ASTAnyTypeDeclaration, ASTMethodOrConstructorDeclaration> {
+@Deprecated
+public final class JavaMetricsComputer extends AbstractMetricsComputer<ASTAnyTypeDeclaration, MethodLikeNode> {
 
-    static final JavaMetricsComputer INSTANCE = new JavaMetricsComputer();
+    private static final JavaMetricsComputer INSTANCE = new JavaMetricsComputer();
 
 
     private JavaMetricsComputer() {
-
     }
 
-
+    // TODO: doesn't consider lambdas
     @Override
-    protected List<ASTMethodOrConstructorDeclaration> findOperations(ASTAnyTypeDeclaration node) {
+    protected List<MethodLikeNode> findOperations(ASTAnyTypeDeclaration node) {
+        return JavaMetrics.findOps(node);
+    }
 
-        List<ASTMethodOrConstructorDeclaration> operations = new ArrayList<>();
-
-        for (ASTAnyTypeBodyDeclaration decl : node.getDeclarations()) {
-            if (decl.jjtGetNumChildren() > 0 && decl.jjtGetChild(0) instanceof ASTMethodOrConstructorDeclaration) {
-                operations.add((ASTMethodOrConstructorDeclaration) decl.jjtGetChild(0));
-            }
-        }
-        return operations;
+    @InternalApi
+    public static JavaMetricsComputer getInstance() {
+        return INSTANCE;
     }
 
 }

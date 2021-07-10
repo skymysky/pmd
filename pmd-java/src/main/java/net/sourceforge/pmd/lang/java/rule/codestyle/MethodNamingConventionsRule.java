@@ -4,63 +4,128 @@
 
 package net.sourceforge.pmd.lang.java.rule.codestyle;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Pattern;
 
-import net.sourceforge.pmd.lang.java.ast.ASTClassOrInterfaceBodyDeclaration;
-import net.sourceforge.pmd.lang.java.ast.ASTCompilationUnit;
-import net.sourceforge.pmd.lang.java.ast.ASTMarkerAnnotation;
+import net.sourceforge.pmd.lang.ast.Node;
+import net.sourceforge.pmd.lang.java.ast.ASTAllocationExpression;
+import net.sourceforge.pmd.lang.java.ast.ASTAnyTypeDeclaration;
+import net.sourceforge.pmd.lang.java.ast.ASTClassOrInterfaceDeclaration;
+import net.sourceforge.pmd.lang.java.ast.ASTEnumConstant;
 import net.sourceforge.pmd.lang.java.ast.ASTMethodDeclaration;
-import net.sourceforge.pmd.lang.java.ast.ASTMethodDeclarator;
-import net.sourceforge.pmd.lang.java.ast.ASTName;
-import net.sourceforge.pmd.lang.java.rule.AbstractJavaRule;
+import net.sourceforge.pmd.lang.java.types.TypeTestUtil;
 import net.sourceforge.pmd.properties.BooleanProperty;
+import net.sourceforge.pmd.properties.PropertyBuilder.RegexPropertyBuilder;
+import net.sourceforge.pmd.properties.PropertyDescriptor;
 
-public class MethodNamingConventionsRule extends AbstractJavaRule {
 
-    private boolean checkNativeMethods;
+public class MethodNamingConventionsRule extends AbstractNamingConventionRule<ASTMethodDeclaration> {
 
+    private final Map<String, String> descriptorToDisplayName = new HashMap<>();
+
+    @Deprecated
     private static final BooleanProperty CHECK_NATIVE_METHODS_DESCRIPTOR = new BooleanProperty("checkNativeMethods",
-            "Check native methods", true, 1.0f);
+                                                                                               "deprecated! Check native methods", true, 1.0f);
+
+
+    private final PropertyDescriptor<Pattern> instanceRegex = defaultProp("", "instance").build();
+    private final PropertyDescriptor<Pattern> staticRegex = defaultProp("static").build();
+    private final PropertyDescriptor<Pattern> nativeRegex = defaultProp("native").build();
+    private final PropertyDescriptor<Pattern> junit3Regex = defaultProp("JUnit 3 test").defaultValue("test[A-Z0-9][a-zA-Z0-9]*").build();
+    private final PropertyDescriptor<Pattern> junit4Regex = defaultProp("JUnit 4 test").build();
+    private final PropertyDescriptor<Pattern> junit5Regex = defaultProp("JUnit 5 test").build();
+
 
     public MethodNamingConventionsRule() {
         definePropertyDescriptor(CHECK_NATIVE_METHODS_DESCRIPTOR);
+
+        definePropertyDescriptor(instanceRegex);
+        definePropertyDescriptor(staticRegex);
+        definePropertyDescriptor(nativeRegex);
+        definePropertyDescriptor(junit3Regex);
+        definePropertyDescriptor(junit4Regex);
+        definePropertyDescriptor(junit5Regex);
     }
 
-    public Object visit(ASTCompilationUnit node, Object data) {
-        checkNativeMethods = getProperty(CHECK_NATIVE_METHODS_DESCRIPTOR);
+    private boolean isJunit5Test(ASTMethodDeclaration node) {
+        return node.isAnnotationPresent("org.junit.jupiter.api.Test");
+    }
+
+    private boolean isJunit4Test(ASTMethodDeclaration node) {
+        return node.isAnnotationPresent("org.junit.Test");
+    }
+
+
+    private boolean isJunit3Test(ASTMethodDeclaration node) {
+        if (!node.getName().startsWith("test")) {
+            return false;
+        }
+
+        // Considers anonymous classes, TODO with #905 this will be easier
+        Node parent = node.getFirstParentOfAnyType(ASTEnumConstant.class, ASTAllocationExpression.class, ASTAnyTypeDeclaration.class);
+
+        if (!(parent instanceof ASTClassOrInterfaceDeclaration) || ((ASTClassOrInterfaceDeclaration) parent).isInterface()) {
+            return false;
+        }
+
+        return TypeTestUtil.isA("junit.framework.TestCase", (ASTClassOrInterfaceDeclaration) parent);
+    }
+
+
+    @Override
+    public Object visit(ASTMethodDeclaration node, Object data) {
+
+        if (node.isAnnotationPresent("java.lang.Override")) {
+            return super.visit(node, data);
+        }
+
+        if (node.isNative()) {
+            if (getProperty(CHECK_NATIVE_METHODS_DESCRIPTOR)) {
+                checkMatches(node, nativeRegex, data);
+            } else {
+                return super.visit(node, data);
+            }
+        } else if (node.isStatic()) {
+            checkMatches(node, staticRegex, data);
+        } else if (isJunit5Test(node)) {
+            checkMatches(node, junit5Regex, data);
+        } else if (isJunit4Test(node)) {
+            checkMatches(node, junit4Regex, data);
+        } else if (isJunit3Test(node)) {
+            checkMatches(node, junit3Regex, data);
+        } else {
+            checkMatches(node, instanceRegex, data);
+        }
+
         return super.visit(node, data);
     }
 
-    public Object visit(ASTMethodDeclarator node, Object data) {
-        if (!checkNativeMethods && node.getFirstParentOfType(ASTMethodDeclaration.class).isNative()) {
-            return data;
-        }
 
-        if (isOverriddenMethod(node)) {
-            return data;
-        }
-
-        String methodName = node.getImage();
-
-        if (Character.isUpperCase(methodName.charAt(0))) {
-            addViolationWithMessage(data, node, "Method names should not start with capital letters");
-        }
-        if (methodName.indexOf('_') >= 0) {
-            addViolationWithMessage(data, node, "Method names should not contain underscores");
-        }
-        return data;
+    @Override
+    String defaultConvention() {
+        return CAMEL_CASE;
     }
 
-    private boolean isOverriddenMethod(ASTMethodDeclarator node) {
-        ASTClassOrInterfaceBodyDeclaration declaration = node
-                .getFirstParentOfType(ASTClassOrInterfaceBodyDeclaration.class);
-        List<ASTMarkerAnnotation> annotations = declaration.findDescendantsOfType(ASTMarkerAnnotation.class);
-        for (ASTMarkerAnnotation ann : annotations) {
-            ASTName name = ann.getFirstChildOfType(ASTName.class);
-            if (name != null && name.hasImageEqualTo("Override")) {
-                return true;
-            }
-        }
-        return false;
+
+    @Override
+    String nameExtractor(ASTMethodDeclaration node) {
+        return node.getName();
+    }
+
+    @Override
+    RegexPropertyBuilder defaultProp(String name, String displayName) {
+        String display = (displayName + " method").trim();
+        RegexPropertyBuilder prop = super.defaultProp(name.isEmpty() ? "method" : name, display);
+
+        descriptorToDisplayName.put(prop.getName(), display);
+
+        return prop;
+    }
+
+
+    @Override
+    String kindDisplayName(ASTMethodDeclaration node, PropertyDescriptor<Pattern> descriptor) {
+        return descriptorToDisplayName.get(descriptor.name());
     }
 }

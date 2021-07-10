@@ -17,7 +17,7 @@ package net.sourceforge.pmd.lang.vm.directive;
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
- * under the License.    
+ * under the License.
  */
 
 /**
@@ -27,32 +27,36 @@ package net.sourceforge.pmd.lang.vm.directive;
  *
  * @author <a href="mailto:geirm@optonline.net">Geir Magnusson Jr.</a>
  * @version $Id: VelocimacroProxy.java 898032 2010-01-11 19:51:03Z nbubna $
+ * @deprecated for removal in PMD 7.0.0
  */
+@Deprecated
 public class VelocimacroProxy extends Directive {
     private String macroName;
     private int numMacroArgs = 0;
 
     /**
      * Return name of this Velocimacro.
-     * 
+     *
      * @return The name of this Velocimacro.
      */
+    @Override
     public String getName() {
         return macroName;
     }
 
     /**
      * Velocimacros are always LINE type directives.
-     * 
+     *
      * @return The type of this directive.
      */
+    @Override
     public int getType() {
         return LINE;
     }
 
     /**
      * sets the directive name of this VM
-     * 
+     *
      * @param name
      */
     public void setName(String name) {
@@ -61,7 +65,7 @@ public class VelocimacroProxy extends Directive {
 
     /**
      * sets the array of arguments specified in the macro definition
-     * 
+     *
      * @param arr
      */
     public void setArgArray(String[] arr) {
@@ -74,7 +78,7 @@ public class VelocimacroProxy extends Directive {
 
     /**
      * returns the number of ars needed for this VM
-     * 
+     *
      * @return The number of ars needed for this VM
      */
     public int getNumArgs() {

@@ -19,33 +19,33 @@ import net.sourceforge.pmd.lang.java.ast.ASTThrowStatement;
 import net.sourceforge.pmd.lang.java.ast.ASTWhileStatement;
 import net.sourceforge.pmd.lang.java.ast.JavaParserControllessVisitorAdapter;
 
+
 /**
  * Visitor calculating cyclo without counting boolean operators.
+ *
+ * @deprecated Visitor decorators are deprecated because they lead to fragile code.
  *
  * @author Clément Fournier
  * @see net.sourceforge.pmd.lang.java.metrics.impl.CycloMetric
  */
+@Deprecated
 public class CycloBaseVisitor extends JavaParserControllessVisitorAdapter {
 
     /** Instance. */
     public static final CycloBaseVisitor INSTANCE = new CycloBaseVisitor();
 
-    protected CycloBaseVisitor() {
-
-    }
-
     @Override
     public Object visit(ASTSwitchStatement node, Object data) {
-        int childCount = node.jjtGetNumChildren();
+        int childCount = node.getNumChildren();
         int lastIndex = childCount - 1;
 
         for (int n = 0; n < lastIndex; n++) {
-            Node childNode = node.jjtGetChild(n);
+            Node childNode = node.getChild(n);
             if (childNode instanceof ASTSwitchLabel) {
                 // default is not considered a decision (same as "else")
                 ASTSwitchLabel sl = (ASTSwitchLabel) childNode;
                 if (!sl.isDefault()) {
-                    childNode = node.jjtGetChild(n + 1);    // check the label is not empty
+                    childNode = node.getChild(n + 1);    // check the label is not empty
                     if (childNode instanceof ASTBlockStatement) {
                         ((MutableInt) data).increment();
                     }
@@ -59,10 +59,8 @@ public class CycloBaseVisitor extends JavaParserControllessVisitorAdapter {
 
     @Override
     public Object visit(ASTConditionalExpression node, Object data) {
-        if (node.isTernary()) {
-            ((MutableInt) data).increment();
-            super.visit(node, data);
-        }
+        ((MutableInt) data).increment();
+        super.visit(node, data);
         return data;
     }
 

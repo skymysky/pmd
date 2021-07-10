@@ -48,6 +48,11 @@ public abstract class AbstractRule extends AbstractPropertySource implements Rul
         definePropertyDescriptor(Rule.VIOLATION_SUPPRESS_XPATH_DESCRIPTOR);
     }
 
+    @Override
+    protected String getPropertySourceType() {
+        return "rule";
+    }
+
     /**
      * @deprecated Use {@link #deepCopy()} to create verbatim copies of rules.
      */
@@ -66,7 +71,7 @@ public abstract class AbstractRule extends AbstractPropertySource implements Rul
         otherRule.examples = copyExamples();
         otherRule.externalInfoUrl = externalInfoUrl;
         otherRule.priority = priority;
-        otherRule.propertyDescriptors = copyPropertyDescriptors();
+        otherRule.propertyDescriptors = new ArrayList<>(getPropertyDescriptors());
         otherRule.propertyValuesByDescriptor = copyPropertyValues();
         otherRule.usesDFA = usesDFA;
         otherRule.usesTypeResolution = usesTypeResolution;
@@ -224,6 +229,7 @@ public abstract class AbstractRule extends AbstractPropertySource implements Rul
      * @see Rule#setPriority(RulePriority)
      */
     @Override
+    @Deprecated
     public ParserOptions getParserOptions() {
         return new ParserOptions();
     }
@@ -431,15 +437,16 @@ public abstract class AbstractRule extends AbstractPropertySource implements Rul
         return getClass().getName().hashCode() + (getName() != null ? getName().hashCode() : 0)
                 + getPriority().hashCode() + (propertyValues != null ? propertyValues.hashCode() : 0);
     }
-    
+
     @SuppressWarnings("unchecked")
     @Override
     public Rule deepCopy() {
         Rule rule = null;
         try {
             rule = getClass().newInstance();
-        } catch (InstantiationException | IllegalAccessException e) {
+        } catch (InstantiationException | IllegalAccessException ignored) {
             // Can't happen... we already have an instance
+            throw new RuntimeException(ignored); // in case it happens anyway, something is really wrong...
         }
         rule.setName(getName());
         rule.setLanguage(getLanguage());
@@ -458,13 +465,15 @@ public abstract class AbstractRule extends AbstractPropertySource implements Rul
         }
         rule.setPriority(getPriority());
         for (final PropertyDescriptor<?> prop : getPropertyDescriptors()) {
+            // define the descriptor only if it doesn't yet exist
             if (rule.getPropertyDescriptor(prop.name()) == null) {
                 rule.definePropertyDescriptor(prop); // Property descriptors are immutable, and can be freely shared
             }
-            
-            rule.setProperty((PropertyDescriptor<Object>) prop, getProperty((PropertyDescriptor<Object>) prop));
+
+            if (isPropertyOverridden(prop)) {
+                rule.setProperty((PropertyDescriptor<Object>) prop, getProperty((PropertyDescriptor<Object>) prop));
+            }
         }
-        
         return rule;
     }
 }

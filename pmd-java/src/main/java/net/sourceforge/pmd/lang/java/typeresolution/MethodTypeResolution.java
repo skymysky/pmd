@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.lang.java.ast.ASTArgumentList;
 import net.sourceforge.pmd.lang.java.ast.ASTExpression;
@@ -33,7 +34,14 @@ import net.sourceforge.pmd.lang.java.typeresolution.typeinference.TypeInferenceR
 import net.sourceforge.pmd.lang.java.typeresolution.typeinference.Variable;
 
 
+@Deprecated
+@InternalApi
 public final class MethodTypeResolution {
+    /**
+     * 
+     */
+    private static final String MESSAGE_INCOMPLETE_AUXCLASSPATH = "Possible incomplete auxclasspath: Error while processing methods";
+
     private MethodTypeResolution() {}
 
     private static final Logger LOG = Logger.getLogger(MethodTypeResolution.class.getName());
@@ -45,11 +53,15 @@ public final class MethodTypeResolution {
     static {
         final List<Class<?>> primitiveList = new ArrayList<>();
 
+        @SuppressWarnings("PMD.AvoidUsingShortType") // defining a local variable to suppress warnings only for
+        // the following statement
+        Class<?> shortType = short.class;
+
         primitiveList.add(double.class);
         primitiveList.add(float.class);
         primitiveList.add(long.class);
         primitiveList.add(int.class);
-        primitiveList.add(short.class);
+        primitiveList.add(shortType);
         primitiveList.add(byte.class);
         primitiveList.add(char.class); // this is here for convenience, not really in order
 
@@ -66,19 +78,19 @@ public final class MethodTypeResolution {
         boxedList.add(Character.class);
 
         BOXED_PRIMITIVE_SUBTYPE_ORDER = Collections.unmodifiableList(boxedList);
-        
+
         final Map<Class<?>, Class<?>> boxingRules = new HashMap<>();
-        
+
         boxingRules.put(double.class, Double.class);
         boxingRules.put(float.class, Float.class);
         boxingRules.put(long.class, Long.class);
         boxingRules.put(int.class, Integer.class);
-        boxingRules.put(short.class, Short.class);
+        boxingRules.put(shortType, Short.class);
         boxingRules.put(byte.class, Byte.class);
         boxingRules.put(char.class, Character.class);
         boxingRules.put(boolean.class, Boolean.class);
         boxingRules.put(void.class, Void.class);
-        
+
         PRIMITIVE_BOXING_RULES = Collections.unmodifiableMap(boxingRules);
     }
 
@@ -114,7 +126,7 @@ public final class MethodTypeResolution {
                                                            List<MethodType> methodsToSearch, ASTArgumentList argList) {
         // TODO: check if explicit type arguments are applicable to the type parameter bounds
         List<MethodType> selectedMethods = new ArrayList<>();
-        final int argCount = argList == null ? 0 : argList.jjtGetNumChildren();
+        final int argCount = argList == null ? 0 : argList.getNumChildren();
 
         outter:
         for (int methodIndex = 0; methodIndex < methodsToSearch.size(); ++methodIndex) {
@@ -132,7 +144,7 @@ public final class MethodTypeResolution {
                     // primitive type; then the method is not applicable and there is no need to proceed with inference.
                     Class<?>[] methodParameterTypes = methodType.getMethod().getParameterTypes();
                     for (int argIndex = 0; argIndex < argCount; ++argIndex) {
-                        if (((ASTExpression) argList.jjtGetChild(argIndex)).isStandAlonePrimitive()) {
+                        if (((ASTExpression) argList.getChild(argIndex)).isStandAlonePrimitive()) {
                             if (!methodParameterTypes[argIndex].isPrimitive()) {
                                 continue outter; // this method is not applicable
                             }
@@ -142,7 +154,7 @@ public final class MethodTypeResolution {
                     }
 
                     methodType = parameterizeInvocation(context, methodType.getMethod(), argList);
-                    
+
                     // May be null if the method call is not applicable
                     if (methodType == null) {
                         continue;
@@ -156,7 +168,7 @@ public final class MethodTypeResolution {
                 // try each arguments if it's subtypeable
                 for (int argIndex = 0; argIndex < argCount; ++argIndex) {
                     if (!isSubtypeable(methodType.getParameterTypes().get(argIndex),
-                                       (ASTExpression) argList.jjtGetChild(argIndex))) {
+                                       (ASTExpression) argList.getChild(argIndex))) {
                         methodIsApplicable = false;
                         break;
                     }
@@ -210,7 +222,7 @@ public final class MethodTypeResolution {
 
             if (typeParamIndex != -1) {
                 // TODO: we are cheating here, it should be a contraint of the form 'var -> expression' not 'var->type'
-                result.add(new Constraint(((TypeNode) argList.jjtGetChild(i)).getTypeDefinition(),
+                result.add(new Constraint(((TypeNode) argList.getChild(i)).getTypeDefinition(),
                                           variables.get(typeParamIndex), LOOSE_INVOCATION));
             }
         }
@@ -273,7 +285,7 @@ public final class MethodTypeResolution {
     public static List<MethodType> selectMethodsSecondPhase(List<MethodType> methodsToSearch, ASTArgumentList argList) {
         // TODO: check if explicit type arguments are applicable to the type parameter bounds
         List<MethodType> selectedMethods = new ArrayList<>();
-        final int argCount = argList == null ? 0 : argList.jjtGetNumChildren();
+        final int argCount = argList == null ? 0 : argList.getNumChildren();
 
         for (int methodIndex = 0; methodIndex < methodsToSearch.size(); ++methodIndex) {
             MethodType methodType = methodsToSearch.get(methodIndex);
@@ -289,7 +301,7 @@ public final class MethodTypeResolution {
                 // try each arguments if it's method convertible
                 for (int argIndex = 0; argIndex < argCount; ++argIndex) {
                     if (!isMethodConvertible(methodType.getParameterTypes().get(argIndex),
-                                             (ASTExpression) argList.jjtGetChild(argIndex))) {
+                                             (ASTExpression) argList.getChild(argIndex))) {
                         methodIsApplicable = false;
                         break;
                     }
@@ -334,18 +346,18 @@ public final class MethodTypeResolution {
                     methodIsApplicable = getArity(methodType.getMethod()) == 1;
                 } else {
                     // try each arguments if it's method convertible
-                    for (int argIndex = 0; argIndex < argList.jjtGetNumChildren(); ++argIndex) {
+                    for (int argIndex = 0; argIndex < argList.getNumChildren(); ++argIndex) {
                         JavaTypeDefinition parameterType = argIndex < methodParameters.size() - 1
                                 ? methodParameters.get(argIndex) : varargComponentType;
-    
-                        if (!isMethodConvertible(parameterType, (ASTExpression) argList.jjtGetChild(argIndex))) {
+
+                        if (!isMethodConvertible(parameterType, (ASTExpression) argList.getChild(argIndex))) {
                             methodIsApplicable = false;
                             break;
                         }
-    
+
                         // TODO: If k != n, or if k = n and An cannot be converted by method invocation conversion to
                         // Sn[], then the type which is the erasure (§4.6) of Sn is accessible at the point of invocation.
-    
+
                         // TODO: add unchecked conversion in an else if branch
                     }
                 }
@@ -468,28 +480,41 @@ public final class MethodTypeResolution {
                     result.add(getTypeDefOfMethod(context, method, typeArguments));
                 }
             }
-        } catch (final LinkageError ignored) {
-            // TODO : This is an incomplete classpath, report the missing class
+        } catch (final LinkageError e) {
+            // This is an incomplete classpath, report the missing class
+            LOG.log(Level.FINE, MESSAGE_INCOMPLETE_AUXCLASSPATH, e);
         }
 
         // search it's supertype
         if (!contextClass.equals(Object.class)) {
-            List<MethodType> inheritedMethods = getApplicableMethods(context.resolveTypeDefinition(contextClass.getGenericSuperclass()),
+            try {
+                List<MethodType> inheritedMethods = getApplicableMethods(context.resolveTypeDefinition(contextClass.getGenericSuperclass()),
                                                methodName, typeArguments, argArity, accessingClass);
 
-            // but only add the found methods of the supertype, if they have not been overridden
-            // TODO: verify whether this simplified overriding detection is good enough and at the correct place
-            for (MethodType inherited : inheritedMethods) {
-                if (!result.contains(inherited)) {
-                    result.add(inherited);
+                // but only add the found methods of the supertype, if they have not been overridden
+                // TODO: verify whether this simplified overriding detection is good enough and at the correct place
+                for (MethodType inherited : inheritedMethods) {
+                    if (!result.contains(inherited)) {
+                        result.add(inherited);
+                    }
                 }
+            } catch (TypeNotPresentException | LinkageError e) {
+                // might be thrown by contextClass.getGenericSuperclass()
+                // This is an incomplete classpath, report the missing class
+                LOG.log(Level.FINE, MESSAGE_INCOMPLETE_AUXCLASSPATH, e);
             }
         }
 
         // search it's interfaces
-        for (Type interfaceType : contextClass.getGenericInterfaces()) {
-            result.addAll(getApplicableMethods(context.resolveTypeDefinition(interfaceType),
-                                               methodName, typeArguments, argArity, accessingClass));
+        try {
+            for (Type interfaceType : contextClass.getGenericInterfaces()) {
+                result.addAll(getApplicableMethods(context.resolveTypeDefinition(interfaceType),
+                                                   methodName, typeArguments, argArity, accessingClass));
+            }
+        } catch (TypeNotPresentException | LinkageError e) {
+            // might be thrown by contextClass.getGenericInterface()
+            // This is an incomplete classpath, report the missing class
+            LOG.log(Level.FINE, MESSAGE_INCOMPLETE_AUXCLASSPATH, e);
         }
 
         return result;
@@ -502,15 +527,22 @@ public final class MethodTypeResolution {
             return MethodType.build(method);
         }
 
-        JavaTypeDefinition returnType = context.resolveTypeDefinition(method.getGenericReturnType(),
-                                                                      method, typeArguments);
-        List<JavaTypeDefinition> argTypes = new ArrayList<>();
+        try {
+            JavaTypeDefinition returnType = context.resolveTypeDefinition(method.getGenericReturnType(),
+                                                                          method, typeArguments);
+            List<JavaTypeDefinition> argTypes = new ArrayList<>();
 
-        for (Type argType : method.getGenericParameterTypes()) {
-            argTypes.add(context.resolveTypeDefinition(argType, method, typeArguments));
+            for (Type argType : method.getGenericParameterTypes()) {
+                argTypes.add(context.resolveTypeDefinition(argType, method, typeArguments));
+            }
+            return MethodType.build(returnType, argTypes, method);
+        } catch (TypeNotPresentException | LinkageError e) {
+            // might be thrown by method.getGenericReturnType() and method.getGenericParameterTypes()
+            // This is an incomplete classpath, report the missing class
+            LOG.log(Level.FINE, MESSAGE_INCOMPLETE_AUXCLASSPATH, e);
+
+            return MethodType.build(method);
         }
-
-        return MethodType.build(returnType, argTypes, method);
     }
 
 
@@ -521,21 +553,16 @@ public final class MethodTypeResolution {
     public static boolean isMethodApplicable(Method method, String methodName, int argArity,
                                              Class<?> accessingClass, List<JavaTypeDefinition> typeArguments) {
 
-        if (method.getName().equals(methodName) // name matches
+        return method.getName().equals(methodName) // name matches
                 // is visible
                 && isMemberVisibleFromClass(method.getDeclaringClass(), method.getModifiers(), accessingClass)
                 // if method is vararg with arity n, then the invocation's arity >= n - 1
-                && (!method.isVarArgs() || (argArity >= getArity(method) - 1))
+                && (!method.isVarArgs() || argArity >= getArity(method) - 1)
                 // if the method isn't vararg, then arity matches
-                && (method.isVarArgs() || (argArity == getArity(method)))
+                && (method.isVarArgs() || argArity == getArity(method))
                 // isn't generic or arity of type arguments matches that of parameters
                 && (!isGeneric(method) || typeArguments.isEmpty()
-                || method.getTypeParameters().length == typeArguments.size())) {
-
-            return true;
-        }
-
-        return false;
+                || method.getTypeParameters().length == typeArguments.size());
     }
 
 
@@ -550,7 +577,7 @@ public final class MethodTypeResolution {
      */
     public static boolean isMemberVisibleFromClass(Class<?> classWithMember, int modifiers, Class<?> accessingClass) {
         if (accessingClass == null) {
-            return false;
+            return true;
         }
 
         // public members
@@ -627,15 +654,10 @@ public final class MethodTypeResolution {
         // covers unboxing
         int indexInBoxed = BOXED_PRIMITIVE_SUBTYPE_ORDER.indexOf(argument.getType());
 
-        if (indexInBoxed != -1 // arg is boxed primitive
+        return indexInBoxed != -1 // arg is boxed primitive
                 && isSubtypeable(parameter,
-                                 JavaTypeDefinition.forClass(PRIMITIVE_SUBTYPE_ORDER.get(indexInBoxed)))) {
-            return true;
-        }
-
+                                 JavaTypeDefinition.forClass(PRIMITIVE_SUBTYPE_ORDER.get(indexInBoxed)));
         // TODO: add raw unchecked conversion part
-
-        return false;
     }
 
     public static boolean isSubtypeable(JavaTypeDefinition parameter, ASTExpression argument) {
@@ -672,6 +694,12 @@ public final class MethodTypeResolution {
             // example result: List<String>.getAsSuper(Collection) becomes Collection<String>
             JavaTypeDefinition argSuper = argument.getAsSuper(parameter.getType());
             // argSuper can't be null because isAssignableFrom check above returned true
+            // it might be null however, if the auxclasspath was not complete...
+            if (argSuper == null) {
+                // that's not really correct, because the generic type are ignored...
+                // be we can't compare the types
+                return true;
+            }
 
             // right now we only check if generic arguments are the same
             // TODO: add support for wildcard types
@@ -717,8 +745,14 @@ public final class MethodTypeResolution {
 
         List<JavaTypeDefinition> result = new ArrayList<>();
 
-        for (int childIndex = 0; childIndex < typeArguments.jjtGetNumChildren(); ++childIndex) {
-            result.add(((TypeNode) typeArguments.jjtGetChild(childIndex)).getTypeDefinition());
+        for (int childIndex = 0; childIndex < typeArguments.getNumChildren(); ++childIndex) {
+            JavaTypeDefinition typeDefinition = ((TypeNode) typeArguments.getChild(childIndex)).getTypeDefinition();
+            // avoid returning null. Null means, we couldn't resolve the explicit type of the type argument
+            // probably because of incomplete auxclasspath. In that case, we just use Object as the type.
+            if (typeDefinition == null) {
+                typeDefinition = JavaTypeDefinition.forClass(Object.class);
+            }
+            result.add(typeDefinition);
         }
 
         return result;

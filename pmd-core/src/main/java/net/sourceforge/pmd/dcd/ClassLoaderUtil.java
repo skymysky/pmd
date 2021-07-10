@@ -11,8 +11,10 @@ import java.lang.reflect.Method;
 /**
  * ClassLoader utilities. Useful for extracting additional details from a class
  * hierarchy beyond the basic standard Java Reflection APIs.
+ * @deprecated See {@link DCD}
  */
-public class ClassLoaderUtil {
+@Deprecated
+public final class ClassLoaderUtil {
 
     public static final String CLINIT = "<clinit>";
 
@@ -31,9 +33,7 @@ public class ClassLoaderUtil {
     public static Class<?> getClass(String name) {
         try {
             return ClassLoaderUtil.class.getClassLoader().loadClass(name);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        } catch (NoClassDefFoundError e) {
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
             throw new RuntimeException(e);
         }
     }
@@ -56,8 +56,8 @@ public class ClassLoaderUtil {
             for (Class<?> superInterface : type.getInterfaces()) {
                 try {
                     return myGetField(superInterface, name);
-                } catch (NoSuchFieldException e2) {
-                    // Okay
+                } catch (NoSuchFieldException ignored) {
+                    // Ignored, we'll try the super class next
                 }
             }
             // Try the super classes
@@ -99,8 +99,8 @@ public class ClassLoaderUtil {
                     // + type.getSuperclass());
                     return myGetMethod(type.getSuperclass(), name, parameterTypes);
                 }
-            } catch (NoSuchMethodException e2) {
-                // Okay
+            } catch (NoSuchMethodException ignored) {
+                // Ignored, we'll try the interfaces next
             }
             // Try the super interfaces
             for (Class<?> superInterface : type.getInterfaces()) {
@@ -108,8 +108,8 @@ public class ClassLoaderUtil {
                     // System.out.println("Checking super interface: "
                     // + superInterface);
                     return myGetMethod(superInterface, name, parameterTypes);
-                } catch (NoSuchMethodException e3) {
-                    // Okay
+                } catch (NoSuchMethodException ignored) {
+                    // Ignored, fall through to the last line, were we throw
                 }
             }
             throw new NoSuchMethodException(type.getName() + '.' + getMethodSignature(name, parameterTypes));
@@ -126,7 +126,7 @@ public class ClassLoaderUtil {
 
     public static String getMethodSignature(String name, Class<?>... parameterTypes) {
         StringBuilder builder = new StringBuilder(name);
-        if (!(name.equals(CLINIT) || name.equals(INIT))) {
+        if (!(CLINIT.equals(name) || INIT.equals(name))) {
             builder.append('(');
             if (parameterTypes != null && parameterTypes.length > 0) {
                 builder.append(parameterTypes[0].getName());
@@ -147,23 +147,29 @@ public class ClassLoaderUtil {
         return parameterTypes;
     }
 
+    @Deprecated
     public static boolean isOverridenMethod(Class<?> clazz, Method method, boolean checkThisClass) {
+        return isOverriddenMethod(clazz, method, checkThisClass);
+    }
+
+    public static boolean isOverriddenMethod(Class<?> clazz, Method method, boolean checkThisClass) {
         try {
             if (checkThisClass) {
                 clazz.getDeclaredMethod(method.getName(), method.getParameterTypes());
                 return true;
             }
-        } catch (NoSuchMethodException e) {
+        } catch (NoSuchMethodException ignored) {
+            // Ignored, checking super class and interfaces next
         }
         // Check super class
         if (clazz.getSuperclass() != null) {
-            if (isOverridenMethod(clazz.getSuperclass(), method, true)) {
+            if (isOverriddenMethod(clazz.getSuperclass(), method, true)) {
                 return true;
             }
         }
         // Check interfaces
         for (Class<?> anInterface : clazz.getInterfaces()) {
-            if (isOverridenMethod(anInterface, method, true)) {
+            if (isOverriddenMethod(anInterface, method, true)) {
                 return true;
             }
         }

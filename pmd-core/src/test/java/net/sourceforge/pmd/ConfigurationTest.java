@@ -5,17 +5,23 @@
 package net.sourceforge.pmd;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
+import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import net.sourceforge.pmd.cache.FileAnalysisCache;
 import net.sourceforge.pmd.cache.NoopAnalysisCache;
@@ -24,6 +30,9 @@ import net.sourceforge.pmd.renderers.Renderer;
 import net.sourceforge.pmd.util.ClasspathClassLoader;
 
 public class ConfigurationTest {
+
+    @Rule
+    public TemporaryFolder folder = new TemporaryFolder();
 
     @Test
     public void testSuppressMarker() {
@@ -56,6 +65,50 @@ public class ConfigurationTest {
         configuration.setClassLoader(null);
         assertEquals("Revert to default ClassLoader", PMDConfiguration.class.getClassLoader(),
                 configuration.getClassLoader());
+    }
+
+    @Test
+    public void auxClasspathWithRelativeFileEmpty() throws IOException {
+        String relativeFilePath = "src/test/resources/net/sourceforge/pmd/cli/auxclasspath-empty.cp";
+        PMDConfiguration configuration = new PMDConfiguration();
+        configuration.prependClasspath("file:" + relativeFilePath);
+        URL[] urls = ((ClasspathClassLoader) configuration.getClassLoader()).getURLs();
+        Assert.assertEquals(0, urls.length);
+    }
+
+    @Test
+    public void auxClasspathWithRelativeFileEmpty2() throws IOException {
+        String relativeFilePath = "./src/test/resources/net/sourceforge/pmd/cli/auxclasspath-empty.cp";
+        PMDConfiguration configuration = new PMDConfiguration();
+        configuration.prependClasspath("file:" + relativeFilePath);
+        URL[] urls = ((ClasspathClassLoader) configuration.getClassLoader()).getURLs();
+        Assert.assertEquals(0, urls.length);
+    }
+
+    @Test
+    public void auxClasspathWithRelativeFile() throws IOException, URISyntaxException {
+        final String FILE_SCHEME = "file";
+
+        String currentWorkingDirectory = new File("").getAbsoluteFile().toURI().getPath();
+        String relativeFilePath = "src/test/resources/net/sourceforge/pmd/cli/auxclasspath.cp";
+        PMDConfiguration configuration = new PMDConfiguration();
+        configuration.prependClasspath("file:" + relativeFilePath);
+        URL[] urls = ((ClasspathClassLoader) configuration.getClassLoader()).getURLs();
+        URI[] uris = new URI[urls.length];
+        for (int i = 0; i < urls.length; i++) {
+            uris[i] = urls[i].toURI();
+        }
+        URI[] expectedUris = new URI[] {
+            new URI(FILE_SCHEME, null, currentWorkingDirectory + "lib1.jar", null),
+            new URI(FILE_SCHEME, null, currentWorkingDirectory + "other/directory/lib2.jar", null),
+            new URI(FILE_SCHEME, null, new File("/home/jondoe/libs/lib3.jar").getAbsoluteFile().toURI().getPath(), null),
+            new URI(FILE_SCHEME, null, currentWorkingDirectory + "classes", null),
+            new URI(FILE_SCHEME, null, currentWorkingDirectory + "classes2", null),
+            new URI(FILE_SCHEME, null, new File("/home/jondoe/classes").getAbsoluteFile().toURI().getPath(), null),
+            new URI(FILE_SCHEME, null, currentWorkingDirectory, null),
+            new URI(FILE_SCHEME, null, currentWorkingDirectory + "relative source dir/bar", null),
+        };
+        Assert.assertArrayEquals(expectedUris, uris);
     }
 
     @Test
@@ -179,11 +232,10 @@ public class ConfigurationTest {
         configuration.setAnalysisCache(null);
         assertNotNull("Default cache was set to null", configuration.getAnalysisCache());
 
-        final File cacheFile = File.createTempFile("pmd-", ".cache");
-        cacheFile.deleteOnExit();
+        final File cacheFile = folder.newFile();
         final FileAnalysisCache analysisCache = new FileAnalysisCache(cacheFile);
         configuration.setAnalysisCache(analysisCache);
-        assertSame("Confgured cache not stored", analysisCache, configuration.getAnalysisCache());
+        assertSame("Configured cache not stored", analysisCache, configuration.getAnalysisCache());
     }
 
     @Test
@@ -198,5 +250,21 @@ public class ConfigurationTest {
         assertNotNull("Not null cache location produces null cache", configuration.getAnalysisCache());
         assertTrue("File cache location doesn't produce a file cache",
                 configuration.getAnalysisCache() instanceof FileAnalysisCache);
+    }
+
+
+    @Test
+    public void testIgnoreIncrementalAnalysis() throws IOException {
+        final PMDConfiguration configuration = new PMDConfiguration();
+
+        // set dummy cache location
+        final File cacheFile = folder.newFile();
+        final FileAnalysisCache analysisCache = new FileAnalysisCache(cacheFile);
+        configuration.setAnalysisCache(analysisCache);
+        assertNotNull("Null cache location accepted", configuration.getAnalysisCache());
+        assertFalse("Non null cache location, cache should not be noop", configuration.getAnalysisCache() instanceof NoopAnalysisCache);
+
+        configuration.setIgnoreIncrementalAnalysis(true);
+        assertTrue("Ignoring incremental analysis should turn the cache into a noop", configuration.getAnalysisCache() instanceof NoopAnalysisCache);
     }
 }

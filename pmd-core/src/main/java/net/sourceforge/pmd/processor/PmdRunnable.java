@@ -17,9 +17,17 @@ import net.sourceforge.pmd.Report;
 import net.sourceforge.pmd.RuleContext;
 import net.sourceforge.pmd.RuleSets;
 import net.sourceforge.pmd.SourceCodeProcessor;
+import net.sourceforge.pmd.annotation.InternalApi;
+import net.sourceforge.pmd.benchmark.TimeTracker;
 import net.sourceforge.pmd.renderers.Renderer;
 import net.sourceforge.pmd.util.datasource.DataSource;
 
+/**
+ *
+ * @deprecated Is internal API
+ */
+@Deprecated
+@InternalApi
 public class PmdRunnable implements Callable<Report> {
 
     private static final Logger LOG = Logger.getLogger(PmdRunnable.class.getName());
@@ -55,6 +63,8 @@ public class PmdRunnable implements Callable<Report> {
 
     @Override
     public Report call() {
+        TimeTracker.initThread();
+
         ThreadContext tc = LOCAL_THREAD_CONTEXT.get();
         if (tc == null) {
             tc = new ThreadContext(new RuleSets(ruleSets), new RuleContext(ruleContext));
@@ -64,7 +74,7 @@ public class PmdRunnable implements Callable<Report> {
         Report report = Report.createReport(tc.ruleContext, fileName);
 
         if (LOG.isLoggable(Level.FINE)) {
-            LOG.fine("Processing " + tc.ruleContext.getSourceCodeFilename());
+            LOG.fine("Processing " + fileName);
         }
         for (Renderer r : renderers) {
             r.startFileAnalysis(dataSource);
@@ -80,6 +90,11 @@ public class PmdRunnable implements Callable<Report> {
         } catch (RuntimeException re) {
             addError(report, re, "RuntimeException during processing of " + fileName);
         }
+
+        TimeTracker.finishThread();
+
+        // merge the sub-report into the global report (thread-safe)
+        ruleContext.getReport().merge(report);
 
         return report;
     }

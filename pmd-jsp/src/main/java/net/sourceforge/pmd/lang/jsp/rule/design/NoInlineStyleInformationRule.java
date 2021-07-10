@@ -4,6 +4,7 @@
 
 package net.sourceforge.pmd.lang.jsp.rule.design;
 
+import java.util.Locale;
 import java.util.Set;
 
 import net.sourceforge.pmd.lang.jsp.ast.ASTAttribute;
@@ -40,6 +41,7 @@ public class NoInlineStyleInformationRule extends AbstractJspRule {
     private static final Set<String> STYLE_ATTRIBUTES = CollectionUtil
             .asSet(new String[] { "STYLE", "FONT", "SIZE", "COLOR", "FACE", "ALIGN", "VALIGN", "BGCOLOR" });
 
+    @Override
     public Object visit(ASTAttribute node, Object data) {
         if (isStyleAttribute(node)) {
             addViolation(data, node);
@@ -48,6 +50,7 @@ public class NoInlineStyleInformationRule extends AbstractJspRule {
         return super.visit(node, data);
     }
 
+    @Override
     public Object visit(ASTElement node, Object data) {
         if (isStyleElement(node)) {
             addViolation(data, node);
@@ -64,7 +67,7 @@ public class NoInlineStyleInformationRule extends AbstractJspRule {
      * @return boolean
      */
     private boolean isStyleElement(ASTElement elementNode) {
-        return STYLE_ELEMENT_NAMES.contains(elementNode.getName().toUpperCase());
+        return STYLE_ELEMENT_NAMES.contains(elementNode.getName().toUpperCase(Locale.ROOT));
     }
 
     /**
@@ -77,10 +80,10 @@ public class NoInlineStyleInformationRule extends AbstractJspRule {
      *         otherwise.
      */
     private boolean isStyleAttribute(ASTAttribute attributeNode) {
-        if (STYLE_ATTRIBUTES.contains(attributeNode.getName().toUpperCase())) {
-            if (attributeNode.jjtGetParent() instanceof ASTElement) {
-                ASTElement parent = (ASTElement) attributeNode.jjtGetParent();
-                if (ELEMENT_NAMES_THAT_CAN_HAVE_STYLE_ATTRIBUTES.contains(parent.getName().toUpperCase())) {
+        if (STYLE_ATTRIBUTES.contains(attributeNode.getName().toUpperCase(Locale.ROOT))) {
+            if (attributeNode.getParent() instanceof ASTElement) {
+                ASTElement parent = (ASTElement) attributeNode.getParent();
+                if (ELEMENT_NAMES_THAT_CAN_HAVE_STYLE_ATTRIBUTES.contains(parent.getName().toUpperCase(Locale.ROOT))) {
                     return true;
                 }
             }

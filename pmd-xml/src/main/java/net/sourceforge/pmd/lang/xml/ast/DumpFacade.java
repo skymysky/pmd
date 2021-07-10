@@ -14,6 +14,11 @@ import java.util.List;
 import net.sourceforge.pmd.lang.ast.xpath.Attribute;
 import net.sourceforge.pmd.util.StringUtil;
 
+/**
+ *
+ * @deprecated This class will be removed with PMD 7. The rule designer is a better way to inspect nodes.
+ */
+@Deprecated
 public class DumpFacade {
 
     private PrintWriter writer;
@@ -33,8 +38,8 @@ public class DumpFacade {
     public Object visit(XmlNode node, Object data) {
         dump(node, (String) data);
         if (recurse) {
-            for (int i = 0; i < node.jjtGetNumChildren(); i++) {
-                visit((XmlNode) node.jjtGetChild(i), data + " ");
+            for (int i = 0; i < node.getNumChildren(); i++) {
+                visit((XmlNode) node.getChild(i), data + " ");
             }
             return data;
         } else {
@@ -51,7 +56,7 @@ public class DumpFacade {
         writer.print(prefix);
 
         // 2) JJT Name of the Node
-        writer.print(node.toString());
+        writer.print(node.getXPathNodeName());
 
         //
         // If there are any additional details, then:

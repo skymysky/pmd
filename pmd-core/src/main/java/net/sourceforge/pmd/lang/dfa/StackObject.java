@@ -4,6 +4,10 @@
 
 package net.sourceforge.pmd.lang.dfa;
 
+/**
+ * @deprecated See {@link DataFlowNode}
+ */
+@Deprecated
 public class StackObject {
 
     private NodeType type;
@@ -24,7 +28,6 @@ public class StackObject {
 
     @Override
     public String toString() {
-        return ("StackObject: type=" + type + ", node=" + node.toString());
-
+        return "StackObject: type=" + type + ", node=" + node.toString();
     }
 }

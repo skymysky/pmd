@@ -7,6 +7,7 @@ package net.sourceforge.pmd.lang.vf.ast;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.util.StringUtil;
 
 /**
@@ -15,10 +16,12 @@ import net.sourceforge.pmd.util.StringUtil;
  * tag list and it will mark the first tag named 'x' as closed. If other tags
  * have been opened after 'x' ( &lt;x&gt; &lt;y&gt; &lt;z&gt; &lt;/x&gt;) it
  * will mark y and z as unclosed.
- * 
+ *
  * @author Victor Bucutea
- * 
+ *
  */
+@Deprecated
+@InternalApi
 public class OpenTagRegister {
 
     private List<ASTElement> tagList = new ArrayList<>();
@@ -32,7 +35,7 @@ public class OpenTagRegister {
     }
 
     /**
-     * 
+     *
      * @param closingTagName
      * @return true if a matching tag was found. False if no tag with this name
      *         was ever opened ( or registered )
@@ -48,12 +51,12 @@ public class OpenTagRegister {
          * name as element
          */
         boolean matchingTagFound = false;
-        List<ASTElement> processedElmnts = new ArrayList<>();
+        List<ASTElement> processedElements = new ArrayList<>();
         for (int i = lastRegisteredTagIdx; i >= 0; i--) {
             ASTElement parent = tagList.get(i);
             String parentName = parent.getName();
 
-            processedElmnts.add(parent);
+            processedElements.add(parent);
             if (parentName.equals(closingTagName)) {
                 // mark this tag as being closed
                 parent.setUnclosed(false);
@@ -82,7 +85,7 @@ public class OpenTagRegister {
          * potentially open <a> parent tag ( but not the one after the <x> )
          */
         if (matchingTagFound) {
-            tagList.removeAll(processedElmnts);
+            tagList.removeAll(processedElements);
         }
 
         return matchingTagFound;

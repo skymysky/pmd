@@ -6,9 +6,7 @@ package net.sourceforge.pmd.properties;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +24,7 @@ import net.sourceforge.pmd.properties.SimpleEnumeratedPropertyTest.Foo;
  *
  * @author Brian Remedios
  */
+@Deprecated
 public class SimpleEnumeratedPropertyTest extends AbstractPropertyDescriptorTester<Foo> {
 
     private static final String[] KEYS = {"bar", "na", "bee", "coo"};
@@ -80,29 +79,18 @@ public class SimpleEnumeratedPropertyTest extends AbstractPropertyDescriptorTest
     }
 
 
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void testDefaultIndexOutOfBounds() {
-        try {
-            EnumeratedMultiProperty<Foo> multi
-                = new EnumeratedMultiProperty<>("testEnumerations", "Test enumerations with simple type",
+        new EnumeratedMultiProperty<>("testEnumerations", "Test enumerations with simple type",
                                                 KEYS, VALUES, new int[] {99}, Foo.class, 1.0f);
-        } catch (IllegalArgumentException iae) {
-            return;
-        }
-        fail();
     }
 
 
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void testNoMappingForDefault() {
-        try {
-            EnumeratedMultiProperty<Foo> multi
-                = new EnumeratedMultiProperty<>("testEnumerations", "Test enumerations with simple type",
-                                                MAPPINGS, Arrays.asList(Foo.IGNORED), Foo.class, 1.0f);
-        } catch (IllegalArgumentException iae) {
-            return;
-        }
-        fail();
+        new EnumeratedMultiProperty<>("testEnumerations", "Test enumerations with simple type",
+                                      MAPPINGS, Collections.singletonList(Foo.IGNORED), Foo.class, 1.0f);
+
     }
 
 
@@ -120,13 +108,13 @@ public class SimpleEnumeratedPropertyTest extends AbstractPropertyDescriptorTest
 
     @Override
     protected Foo createValue() {
-        return randomChoice(Foo.values());
+        return randomChoice(VALUES);
     }
 
 
     @Override
     protected Foo createBadValue() {
-        return null; // not in the set of values
+        return Foo.IGNORED; // not in the set of values
     }
 
 

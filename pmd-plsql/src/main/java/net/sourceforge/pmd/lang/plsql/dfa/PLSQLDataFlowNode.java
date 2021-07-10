@@ -13,12 +13,17 @@ import net.sourceforge.pmd.lang.plsql.ast.ASTProgramUnit;
 import net.sourceforge.pmd.lang.plsql.ast.ASTTriggerUnit;
 import net.sourceforge.pmd.lang.plsql.ast.ASTTypeMethod;
 
+/**
+ * @deprecated See {@link DataFlowNode}
+ */
+@Deprecated
 public class PLSQLDataFlowNode extends AbstractDataFlowNode {
 
     public PLSQLDataFlowNode(List<DataFlowNode> dataFlow, Node node) {
         super(dataFlow, node);
     }
 
+    @Override
     public String toString() {
         String res = "PLSQLDataFlowNode: line " + this.getLine() + ", (Type BitField==" + type + ")";
         if (node instanceof ASTProgramUnit || node instanceof ASTTypeMethod

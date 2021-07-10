@@ -1,27 +1,31 @@
-/**
+/*
  * BSD-style license; for more info see http://pmd.sourceforge.net/license.html
  */
 
 package net.sourceforge.pmd.lang.ecmascript.ast;
 
+import java.util.Locale;
+
 import org.mozilla.javascript.Token;
 import org.mozilla.javascript.ast.VariableDeclaration;
 
+import net.sourceforge.pmd.annotation.InternalApi;
+
 public class ASTVariableDeclaration extends AbstractEcmascriptNode<VariableDeclaration> {
+    @Deprecated
+    @InternalApi
     public ASTVariableDeclaration(VariableDeclaration variableDeclaration) {
         super(variableDeclaration);
-        super.setImage(Token.typeToName(variableDeclaration.getType()).toLowerCase());
+        super.setImage(Token.typeToName(variableDeclaration.getType()).toLowerCase(Locale.ROOT));
     }
 
-    /**
-     * Accept the visitor.
-     */
+    @Override
     public Object jjtAccept(EcmascriptParserVisitor visitor, Object data) {
         return visitor.visit(this, data);
     }
 
     public ASTVariableInitializer getVariableInitializer(int index) {
-        return (ASTVariableInitializer) jjtGetChild(index);
+        return (ASTVariableInitializer) getChild(index);
     }
 
     public boolean isVar() {

@@ -1,4 +1,4 @@
-/**
+/*
  * BSD-style license; for more info see http://pmd.sourceforge.net/license.html
  */
 // stolen from XPath Explorer (http://www.xpathexplorer.com)
@@ -10,10 +10,16 @@ import java.awt.Container;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-
 import javax.swing.JLabel;
 import javax.swing.SwingConstants;
 
+import net.sourceforge.pmd.annotation.InternalApi;
+
+/**
+ * @deprecated Is internal API
+ */
+@Deprecated
+@InternalApi
 public class GridBagHelper {
 
     GridBagLayout gridbag;

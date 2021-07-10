@@ -1,4 +1,54 @@
 /**
+ * Fix #3117 - infinite loop when parsing invalid code nested in lambdas
+ * Andreas Dangel 03/2021
+ *====================================================================
+ * Fix #3145 - parse exception with local records
+ * Clément Fournier 03/2021
+ *====================================================================
+ * Remove support for Java 14 preview language features
+ * JEP 397: Sealed Classes (Second Preview) for Java16 Preview
+ * JEP 395: Records for Java16
+ * JEP 394: Pattern Matching for instanceof for Java16
+ * Andreas Dangel 02/2021
+ *====================================================================
+ * Remove support for Java 13 preview language features.
+ * Promote text blocks as a permanent language features with Java 15.
+ * Support Pattern Matching for instanceof with Java 15 Preview.
+ * Support Records with Java 15 Preview.
+ * Support Local Records with Java 15 Preview.
+ * Support Sealed Classes with Java 15 Preview.
+ * Andreas Dangel 08/2020
+ *====================================================================
+ * Add support for record types introduced as a preview language
+ * feature with Java 14. See JEP 359.
+ * Andreas Dangel 02/2020
+ *====================================================================
+ * Add support for pattern matching for instance of introduced
+ * as a preview language feature with Java 14. See JEP 305.
+ * Clément Fournier 02/2020
+ *====================================================================
+ * Switch Expressions are now a standard feature of Java 14.
+ * Andreas Dangel 02/2020
+ *====================================================================
+ * Add support for the yield statement introduced as a preview language
+ * feature with Java 13. See JEP 354.
+ * Add support for text block literals introduces as a preview language
+ * feature with Java 13. See JEP 355.
+ * Andreas Dangel 08/2019
+ *====================================================================
+ * Fix #1848 Local classes should preserve their modifiers
+ * Clément Fournier 05/2019
+ *====================================================================
+ * Add support for Java 12 switch expressions and switch rules.
+ * Andreas Dangel, Clément Fournier 03/2019
+ *====================================================================
+ * Add support for Java 10 Local Variable Type Inference
+ * See #743. In Java 10 mode, "var" as local variable type is handled special.
+ * Andreas Dangel 04/2018
+ *====================================================================
+ * Fixes #888 [java] ParseException occurs with valid '<>' in Java 1.8 mode
+ * Juan Martin Sotuyo Dodero 01/2018
+ *====================================================================
  * Fixes #793 [java] Parser error with private method in nested classes in interfaces
  * Andreas Dangel 12/2017
  *====================================================================
@@ -186,30 +236,43 @@ options {
   STATIC = false;
   USER_CHAR_STREAM = true;
   JDK_VERSION = "1.5";
-  
+
   MULTI = true;
   VISITOR = true;
   NODE_USES_PARSER = true;
   TRACK_TOKENS = true;
   NODE_PACKAGE="net.sourceforge.pmd.lang.java.ast";
 
+  // disable the calculation of expected tokens when a parse error occurs
+  // depending on the possible allowed next tokens, this
+  // could be expensive (see https://github.com/pmd/pmd/issues/3117)
+  //ERROR_REPORTING = false;
+
   //DEBUG_PARSER = true;
   //DEBUG_LOOKAHEAD = true;
+  //DEBUG_TOKEN_MANAGER = true;
 }
 
 PARSER_BEGIN(JavaParser)
 package net.sourceforge.pmd.lang.java.ast;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import net.sourceforge.pmd.lang.ast.CharStream;
+import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.lang.ast.TokenMgrError;
 public class JavaParser {
 
   private int jdkVersion = 0;
+  private boolean preview = false;
 
   public void setJdkVersion(int jdkVersion) {
    this.jdkVersion = jdkVersion;
+  }
+
+  public void setPreview(boolean preview) {
+    this.preview = preview;
   }
 
   private void throwParseException(String message) {
@@ -269,25 +332,25 @@ public class JavaParser {
       throwParseException("Can't use hexadecimal floating point literals in pre-JDK 1.5 target");
     }
   }
-  
+
   private void checkForBadNumericalLiteralslUsage(Token token) {
     if (jdkVersion < 7) {
       if (token.image.contains("_")) {
         throwParseException("Can't use underscores in numerical literals when running in JDK inferior to 1.7 mode!");
       }
-      	
+
       if (token.image.startsWith("0b") || token.image.startsWith("0B")) {
-        throwParseException("Can't use binary numerical literals when running in JDK inferior to 1.7 mode!");	
+        throwParseException("Can't use binary numerical literals when running in JDK inferior to 1.7 mode!");
       }
     }
   }
-  
+
   private void checkForBadDiamondUsage() {
   	if (jdkVersion < 7) {
       throwParseException("Cannot use the diamond generic notation when running in JDK inferior to 1.7 mode!");
   	}
   }
-  
+
   private void checkForBadTryWithResourcesUsage() {
   	if (jdkVersion < 7) {
       throwParseException("Cannot use the try-with-resources notation when running in JDK inferior to 1.7 mode!");
@@ -330,12 +393,19 @@ public class JavaParser {
       throwParseException("Cannot use explicit receiver parameters when running in JDK inferior to 1.8 mode!");
     }
   }
+
+  private void checkforBadInstanceOfPattern() {
+    if (!(jdkVersion == 15 && preview || jdkVersion >= 16)) {
+      throwParseException("Pattern Matching for instanceof is only supported with Java 15 Preview and Java >= 16");
+    }
+  }
+
   private void checkForBadAnonymousDiamondUsage() {
     if (jdkVersion < 9) {
       ASTAllocationExpression node = (ASTAllocationExpression)jjtree.peekNode();
-      ASTTypeArguments types = node.getFirstDescendantOfType(ASTTypeArguments.class);
+      ASTTypeArguments types = node.getFirstChildOfType(ASTClassOrInterfaceType.class).getFirstChildOfType(ASTTypeArguments.class);
       if (node.isAnonymousClass() && types != null && types.isDiamond()) {
-          throwParseException("Cannot use '<>' with anonymous inner classes when running in JDK inferior to 9 mode!");
+        throwParseException("Cannot use '<>' with anonymous inner classes when running in JDK inferior to 9 mode!");
       }
     }
   }
@@ -366,16 +436,102 @@ public class JavaParser {
       throwParseException("Cannot use concise try-with-resources when running in JDK inferior to 9 mode!");
     }
   }
+  private void checkForBadTypeIdentifierUsage(String image) {
+    if (jdkVersion >= 10 && "var".equals(image)) {
+      throwParseException("With JDK 10, 'var' is a contextual keyword and cannot be used for type declarations!");
+    }
+    if (jdkVersion >= 14 && "yield".equals(image)) {
+      throwParseException("With JDK 14, 'yield' is a contextual keyword and cannot be used for type declarations!");
+    }
+    if ((jdkVersion == 15 && preview || jdkVersion >= 16) && "record".equals(image)) {
+      throwParseException("With JDK 15 Preview and Java >= 16, 'record' is a contextual keyword and cannot be used for type declarations!");
+    }
+    if ((jdkVersion == 15 && preview || jdkVersion == 16 && preview) && "sealed".equals(image)) {
+      throwParseException("With JDK 15 Preview and JDK 16 Preview, 'sealed' is a contextual keyword and cannot be used for type declarations!");
+    }
+    if ((jdkVersion == 15 && preview || jdkVersion == 16 && preview) && "permits".equals(image)) {
+      throwParseException("With JDK 15 Preview and JDK 16 Preview, 'permits' is a contextual keyword and cannot be used for type declarations!");
+    }
+  }
+  private void checkForMultipleCaseLabels() {
+    if (jdkVersion < 14) {
+      throwParseException("Multiple case labels in switch statements are only supported with Java >= 14");
+    }
+  }
+  /**
+   * Keeps track during tree construction, whether we are currently building a switch label.
+   * A switch label must not contain a LambdaExpression.
+   * Unfortunately, we have added LambdaExpression as part of PrimaryPrefix, which is wrong.
+   * To keep compatibility, this flag is used, whether a LambdaExpression should be parsed
+   * in PrimaryPrefix.
+   * See also comment at #Expression().
+   */
+  private boolean inSwitchLabel = false;
+
+  private void checkForSwitchRules() {
+    if (jdkVersion < 14) {
+      throwParseException("Switch rules in switch statements are only supported with Java >= 14");
+    }
+  }
+  private void checkForSwitchExpression() {
+    if (jdkVersion < 14) {
+      throwParseException("Switch expressions are only supported with Java >= 14");
+    }
+  }
+
+  private void checkForYieldStatement() {
+    if (jdkVersion < 14) {
+      throwParseException("Yield statements are only supported with Java >= 14");
+    }
+  }
+
+  private void checkForTextBlockLiteral() {
+    if (!(jdkVersion >= 15)) {
+      throwParseException("Text block literals are only supported with Java >= 15");
+    }
+  }
+
+  private void checkForNewStringSpaceEscape(String s) {
+    if (jdkVersion < 15 && s.contains("\\s") && !s.contains("\\\\s")) {
+      throwParseException("The escape sequence \"\\s\" is only supported with Java >= 15");
+    }
+  }
+
+  private void checkForRecordType() {
+    if (!isRecordTypeSupported()) {
+      throwParseException("Records are only supported with Java 15 Preview and Java >= 16");
+    }
+  }
+
+  private void checkForLocalInterfaceOrEnumType() {
+      if (!isRecordTypeSupported()) {
+          throwParseException("Local interfaces and enums are only supported with Java 15 Preview and Java >= 16");
+      }
+  }
+
+  private boolean isRecordTypeSupported() {
+    return jdkVersion == 15 && preview || jdkVersion >= 16;
+  }
+
+  private boolean isSealedClassSupported() {
+      return jdkVersion == 15 && preview || jdkVersion == 16 && preview;
+  }
+
+  private void checkForSealedClassUsage() {
+     if (!isSealedClassSupported()) {
+        throwParseException("Sealed Classes are only supported with Java 15 Preview");
+     }
+  }
 
   // This is a semantic LOOKAHEAD to determine if we're dealing with an assert
   // Note that this can't be replaced with a syntactic lookahead
   // since "assert" isn't a string literal token
   private boolean isNextTokenAnAssert() {
-    boolean res = getToken(1).image.equals("assert");
-    if (res && jdkVersion <= 3 && getToken(2).image.equals("(")) {
-     res = false;
+    if (jdkVersion <= 3) {
+      return false;
     }
-    return res;
+
+    return getToken(1).image.equals("assert");
   }
 
   private boolean isPrecededByComment(Token tok) {
@@ -392,9 +548,122 @@ public class JavaParser {
   /**
    * Semantic lookahead to check if the next identifier is a
    * specific restricted keyword.
+   *
+   * <p>Restricted keywords are:
+   * var, yield, record, sealed, permits, "non" + "-" + "sealed"
+   *
+   * <p>enum and assert is used like restricted keywords, as they were not keywords
+   * in the early java versions.
    */
-  private boolean isKeyword(String keyword) {
-    return getToken(1).kind == IDENTIFIER && getToken(1).image.equals(keyword);
+  private boolean isKeyword(String image) {
+    return isKeyword(1, image);
+  }
+
+  private boolean isKeyword(int index, String image) {
+      Token token = getToken(index);
+      return token.kind == IDENTIFIER && token.image.equals(image);
+  }
+
+  private boolean isToken(int index, int kind) {
+      return getToken(index).kind == kind;
+  }
+
+  /**
+   * Semantic lookahead which matches "non-sealed".
+   *
+   * <p>"non-sealed" cannot be a token, for several reasons:
+   * It is only a keyword with java15 preview+, it consists actually
+   * of several separate tokens, which are valid on their own.
+   */
+  private boolean isNonSealedModifier() {
+      if (isKeyword(1, "non") && isToken(2, MINUS) && isKeyword(3, "sealed")) {
+          Token nonToken = getToken(1);
+          Token minusToken = getToken(2);
+          Token sealedToken = getToken(3);
+          return nonToken.endColumn + 1 == minusToken.beginColumn
+            && minusToken.endColumn + 1 == sealedToken.beginColumn;
+      }
+      return false;
+  }
+
+  private boolean classModifierLookahead() {
+      Token next = getToken(1);
+      return next.kind == AT
+        || next.kind == PUBLIC
+        || next.kind == PROTECTED
+        || next.kind == PRIVATE
+        || next.kind == ABSTRACT
+        || next.kind == STATIC
+        || next.kind == FINAL
+        || next.kind == STRICTFP
+        || isSealedClassSupported() && isKeyword("sealed")
+        || isSealedClassSupported() && isNonSealedModifier();
+  }
+
+  private boolean localTypeDeclLookahead() {
+      Token next = getToken(1);
+      return next.kind == CLASS
+        || isRecordTypeSupported() && next.kind == INTERFACE
+        || isRecordTypeSupported() && next.kind == IDENTIFIER && next.image.equals("enum")
+        || isRecordTypeSupported() && next.kind == IDENTIFIER && next.image.equals("record") && isToken(2, IDENTIFIER);
+  }
+
+  /**
+   *  True if we're in a switch block, one precondition for parsing a yield
+   *  statement.
+   */
+  private boolean inSwitchExprBlock = false;
+
+  private boolean isYieldStart() {
+    return inSwitchExprBlock && jdkVersion >= 14
+    && isKeyword("yield")
+    && mayStartExprAfterYield(2);
+  }
+
+  private boolean mayStartExprAfterYield(final int offset) {
+      // based off of https://hg.openjdk.java.net/jdk/jdk/file/bc3da0226ffa/src/jdk.compiler/share/classes/com/sun/tools/javac/parser/JavacParser.java#l2580
+      // please don't sue me
+      Token token = getToken(offset);
+      if (token == null) return false; // eof
+      switch (token.kind) {
+           case PLUS: case MINUS: case STRING_LITERAL: case CHARACTER_LITERAL:
+           case INTEGER_LITERAL: case FLOATING_POINT_LITERAL: case HEX_FLOATING_POINT_LITERAL:
+           case NULL: case IDENTIFIER: case TRUE: case FALSE:
+           case NEW: case SWITCH: case THIS: case SUPER:
+               return true;
+           case INCR: case DECR:
+               return getToken(offset + 1).kind != SEMICOLON; // eg yield++;
+           case LPAREN:
+               int lookahead = offset + 1;
+               int balance = 1;
+               Token t;
+               while ((t = getToken(lookahead)) != null && balance > 0) {
+                   switch (t.kind) {
+                       case LPAREN: balance++; break;
+                       case RPAREN: balance--; break;
+                       case COMMA: if (balance == 1) return false; // a method call, eg yield(1, 2);
+                   }
+                   lookahead++;
+               }
+               // lambda:       yield () -> {};
+               // method call:  yield ();
+               return t != null
+                   && (lookahead != offset + 2 // ie ()
+                   || t.kind == LAMBDA);
+           default:
+               return false;
+      }
+  }
+
+  private boolean shouldStartStatementInSwitch() {
+    switch (getToken(1).kind) {
+        case _DEFAULT:
+        case CASE:
+        case RBRACE:
+            return false;
+        default:
+            return true;
+    }
   }
 
   public Map<Integer, String> getSuppressMap() {
@@ -418,7 +687,8 @@ TOKEN_MGR_DECLS :
 
 SPECIAL_TOKEN :
 {
-  " " | "\t" | "\n" | "\r" | "\f"
+  < HORIZONTAL_WHITESPACE: [" ", "\t", "\f"] >
+| < LINE_TERMINATOR: "\n" | "\r" | "\r\n" >
 }
 
 SPECIAL_TOKEN :
@@ -582,18 +852,27 @@ TOKEN :
       )
       "'"
   >
+| < #STRING_ESCAPE:
+      "\\"
+      ( ["n","t","b","r","f", "s", "\\","'","\""]
+      // octal escapes
+      | ["0"-"7"] ( ["0"-"7"] )?
+      | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+      )
+  >
 |
   < STRING_LITERAL:
       "\""
       (   (~["\"","\\","\n","\r"])
-        | ("\\"
-            ( ["n","t","b","r","f","\\","'","\""]
-            | ["0"-"7"] ( ["0"-"7"] )?
-            | ["0"-"3"] ["0"-"7"] ["0"-"7"]
-            )
-          )
+        | <STRING_ESCAPE>
       )*
       "\""
+  >
+|
+  < TEXT_BLOCK_LITERAL:
+     "\"\"\"" (<HORIZONTAL_WHITESPACE>)* <LINE_TERMINATOR>
+        ( ~["\"", "\\"] | "\"" ~["\""] | "\"\"" ~["\""] | <STRING_ESCAPE> | "\\" <LINE_TERMINATOR> )*
+     "\"\"\""
   >
 }
 
@@ -601,650 +880,130 @@ TOKEN :
 
 TOKEN :
 {
-  < IDENTIFIER: <LETTER> (<PART_LETTER>)* >
-|
-  < #LETTER:
-      [  // all chars for which Character.isIdentifierStart is true
-         "$",
-         "A"-"Z",
-         "_",
-         "a"-"z",
-         "\u00a2"-"\u00a5",
-         "\u00aa",
-         "\u00b5",
-         "\u00ba",
-         "\u00c0"-"\u00d6",
-         "\u00d8"-"\u00f6",
-         "\u00f8"-"\u021f",
-         "\u0222"-"\u0233",
-         "\u0250"-"\u02ad",
-         "\u02b0"-"\u02b8",
-         "\u02bb"-"\u02c1",
-         "\u02d0"-"\u02d1",
-         "\u02e0"-"\u02e4",
-         "\u02ee",
-         "\u037a",
-         "\u0386",
-         "\u0388"-"\u038a",
-         "\u038c",
-         "\u038e"-"\u03a1",
-         "\u03a3"-"\u03ce",
-         "\u03d0"-"\u03d7",
-         "\u03da"-"\u03f3",
-         "\u0400"-"\u0481",
-         "\u048c"-"\u04c4",
-         "\u04c7"-"\u04c8",
-         "\u04cb"-"\u04cc",
-         "\u04d0"-"\u04f5",
-         "\u04f8"-"\u04f9",
-         "\u0531"-"\u0556",
-         "\u0559",
-         "\u0561"-"\u0587",
-         "\u05d0"-"\u05ea",
-         "\u05f0"-"\u05f2",
-         "\u0621"-"\u063a",
-         "\u0640"-"\u064a",
-         "\u0671"-"\u06d3",
-         "\u06d5",
-         "\u06e5"-"\u06e6",
-         "\u06fa"-"\u06fc",
-         "\u0710",
-         "\u0712"-"\u072c",
-         "\u0780"-"\u07a5",
-         "\u0905"-"\u0939",
-         "\u093d",
-         "\u0950",
-         "\u0958"-"\u0961",
-         "\u0985"-"\u098c",
-         "\u098f"-"\u0990",
-         "\u0993"-"\u09a8",
-         "\u09aa"-"\u09b0",
-         "\u09b2",
-         "\u09b6"-"\u09b9",
-         "\u09dc"-"\u09dd",
-         "\u09df"-"\u09e1",
-         "\u09f0"-"\u09f3",
-         "\u0a05"-"\u0a0a",
-         "\u0a0f"-"\u0a10",
-         "\u0a13"-"\u0a28",
-         "\u0a2a"-"\u0a30",
-         "\u0a32"-"\u0a33",
-         "\u0a35"-"\u0a36",
-         "\u0a38"-"\u0a39",
-         "\u0a59"-"\u0a5c",
-         "\u0a5e",
-         "\u0a72"-"\u0a74",
-         "\u0a85"-"\u0a8b",
-         "\u0a8d",
-         "\u0a8f"-"\u0a91",
-         "\u0a93"-"\u0aa8",
-         "\u0aaa"-"\u0ab0",
-         "\u0ab2"-"\u0ab3",
-         "\u0ab5"-"\u0ab9",
-         "\u0abd",
-         "\u0ad0",
-         "\u0ae0",
-         "\u0b05"-"\u0b0c",
-         "\u0b0f"-"\u0b10",
-         "\u0b13"-"\u0b28",
-         "\u0b2a"-"\u0b30",
-         "\u0b32"-"\u0b33",
-         "\u0b36"-"\u0b39",
-         "\u0b3d",
-         "\u0b5c"-"\u0b5d",
-         "\u0b5f"-"\u0b61",
-         "\u0b85"-"\u0b8a",
-         "\u0b8e"-"\u0b90",
-         "\u0b92"-"\u0b95",
-         "\u0b99"-"\u0b9a",
-         "\u0b9c",
-         "\u0b9e"-"\u0b9f",
-         "\u0ba3"-"\u0ba4",
-         "\u0ba8"-"\u0baa",
-         "\u0bae"-"\u0bb5",
-         "\u0bb7"-"\u0bb9",
-         "\u0c05"-"\u0c0c",
-         "\u0c0e"-"\u0c10",
-         "\u0c12"-"\u0c28",
-         "\u0c2a"-"\u0c33",
-         "\u0c35"-"\u0c39",
-         "\u0c60"-"\u0c61",
-         "\u0c85"-"\u0c8c",
-         "\u0c8e"-"\u0c90",
-         "\u0c92"-"\u0ca8",
-         "\u0caa"-"\u0cb3",
-         "\u0cb5"-"\u0cb9",
-         "\u0cde",
-         "\u0ce0"-"\u0ce1",
-         "\u0d05"-"\u0d0c",
-         "\u0d0e"-"\u0d10",
-         "\u0d12"-"\u0d28",
-         "\u0d2a"-"\u0d39",
-         "\u0d60"-"\u0d61",
-         "\u0d85"-"\u0d96",
-         "\u0d9a"-"\u0db1",
-         "\u0db3"-"\u0dbb",
-         "\u0dbd",
-         "\u0dc0"-"\u0dc6",
-         "\u0e01"-"\u0e30",
-         "\u0e32"-"\u0e33",
-         "\u0e3f"-"\u0e46",
-         "\u0e81"-"\u0e82",
-         "\u0e84",
-         "\u0e87"-"\u0e88",
-         "\u0e8a",
-         "\u0e8d",
-         "\u0e94"-"\u0e97",
-         "\u0e99"-"\u0e9f",
-         "\u0ea1"-"\u0ea3",
-         "\u0ea5",
-         "\u0ea7",
-         "\u0eaa"-"\u0eab",
-         "\u0ead"-"\u0eb0",
-         "\u0eb2"-"\u0eb3",
-         "\u0ebd",
-         "\u0ec0"-"\u0ec4",
-         "\u0ec6",
-         "\u0edc"-"\u0edd",
-         "\u0f00",
-         "\u0f40"-"\u0f47",
-         "\u0f49"-"\u0f6a",
-         "\u0f88"-"\u0f8b",
-         "\u1000"-"\u1021",
-         "\u1023"-"\u1027",
-         "\u1029"-"\u102a",
-         "\u1050"-"\u1055",
-         "\u10a0"-"\u10c5",
-         "\u10d0"-"\u10f6",
-         "\u1100"-"\u1159",
-         "\u115f"-"\u11a2",
-         "\u11a8"-"\u11f9",
-         "\u1200"-"\u1206",
-         "\u1208"-"\u1246",
-         "\u1248",
-         "\u124a"-"\u124d",
-         "\u1250"-"\u1256",
-         "\u1258",
-         "\u125a"-"\u125d",
-         "\u1260"-"\u1286",
-         "\u1288",
-         "\u128a"-"\u128d",
-         "\u1290"-"\u12ae",
-         "\u12b0",
-         "\u12b2"-"\u12b5",
-         "\u12b8"-"\u12be",
-         "\u12c0",
-         "\u12c2"-"\u12c5",
-         "\u12c8"-"\u12ce",
-         "\u12d0"-"\u12d6",
-         "\u12d8"-"\u12ee",
-         "\u12f0"-"\u130e",
-         "\u1310",
-         "\u1312"-"\u1315",
-         "\u1318"-"\u131e",
-         "\u1320"-"\u1346",
-         "\u1348"-"\u135a",
-         "\u13a0"-"\u13f4",
-         "\u1401"-"\u166c",
-         "\u166f"-"\u1676",
-         "\u1681"-"\u169a",
-         "\u16a0"-"\u16ea",
-         "\u1780"-"\u17b3",
-         "\u17db",
-         "\u1820"-"\u1877",
-         "\u1880"-"\u18a8",
-         "\u1e00"-"\u1e9b",
-         "\u1ea0"-"\u1ef9",
-         "\u1f00"-"\u1f15",
-         "\u1f18"-"\u1f1d",
-         "\u1f20"-"\u1f45",
-         "\u1f48"-"\u1f4d",
-         "\u1f50"-"\u1f57",
-         "\u1f59",
-         "\u1f5b",
-         "\u1f5d",
-         "\u1f5f"-"\u1f7d",
-         "\u1f80"-"\u1fb4",
-         "\u1fb6"-"\u1fbc",
-         "\u1fbe",
-         "\u1fc2"-"\u1fc4",
-         "\u1fc6"-"\u1fcc",
-         "\u1fd0"-"\u1fd3",
-         "\u1fd6"-"\u1fdb",
-         "\u1fe0"-"\u1fec",
-         "\u1ff2"-"\u1ff4",
-         "\u1ff6"-"\u1ffc",
-         "\u203f"-"\u2040",
-         "\u207f",
-         "\u20a0"-"\u20af",
-         "\u2102",
-         "\u2107",
-         "\u210a"-"\u2113",
-         "\u2115",
-         "\u2119"-"\u211d",
-         "\u2124",
-         "\u2126",
-         "\u2128",
-         "\u212a"-"\u212d",
-         "\u212f"-"\u2131",
-         "\u2133"-"\u2139",
-         "\u2160"-"\u2183",
-         "\u3005"-"\u3007",
-         "\u3021"-"\u3029",
-         "\u3031"-"\u3035",
-         "\u3038"-"\u303a",
-         "\u3041"-"\u3094",
-         "\u309d"-"\u309e",
-         "\u30a1"-"\u30fe",
-         "\u3105"-"\u312c",
-         "\u3131"-"\u318e",
-         "\u31a0"-"\u31b7",
-         "\u3400"-"\u4db5",
-         "\u4e00"-"\u9fa5",
-         "\ua000"-"\ua48c",
-         "\uac00"-"\ud7a3",
-         "\uf900"-"\ufa2d",
-         "\ufb00"-"\ufb06",
-         "\ufb13"-"\ufb17",
-         "\ufb1d",
-         "\ufb1f"-"\ufb28",
-         "\ufb2a"-"\ufb36",
-         "\ufb38"-"\ufb3c",
-         "\ufb3e",
-         "\ufb40"-"\ufb41",
-         "\ufb43"-"\ufb44",
-         "\ufb46"-"\ufbb1",
-         "\ufbd3"-"\ufd3d",
-         "\ufd50"-"\ufd8f",
-         "\ufd92"-"\ufdc7",
-         "\ufdf0"-"\ufdfb",
-         "\ufe33"-"\ufe34",
-         "\ufe4d"-"\ufe4f",
-         "\ufe69",
-         "\ufe70"-"\ufe72",
-         "\ufe74",
-         "\ufe76"-"\ufefc",
-         "\uff04",
-         "\uff21"-"\uff3a",
-         "\uff3f",
-         "\uff41"-"\uff5a",
-         "\uff65"-"\uffbe",
-         "\uffc2"-"\uffc7",
-         "\uffca"-"\uffcf",
-         "\uffd2"-"\uffd7",
-         "\uffda"-"\uffdc",
-         "\uffe0"-"\uffe1",
-         "\uffe5"-"\uffe6"
-      ]
-  >
-|
-  < #PART_LETTER:
-      [  // all chars for which Character.isIdentifierPart is true
-         "\u0000"-"\u0008",
-         "\u000e"-"\u001b",
-         "$",
-         "0"-"9",
-         "A"-"Z",
-         "_",
-         "a"-"z",
-         "\u007f"-"\u009f",
-         "\u00a2"-"\u00a5",
-         "\u00aa",
-         "\u00b5",
-         "\u00ba",
-         "\u00c0"-"\u00d6",
-         "\u00d8"-"\u00f6",
-         "\u00f8"-"\u021f",
-         "\u0222"-"\u0233",
-         "\u0250"-"\u02ad",
-         "\u02b0"-"\u02b8",
-         "\u02bb"-"\u02c1",
-         "\u02d0"-"\u02d1",
-         "\u02e0"-"\u02e4",
-         "\u02ee",
-         "\u0300"-"\u034e",
-         "\u0360"-"\u0362",
-         "\u037a",
-         "\u0386",
-         "\u0388"-"\u038a",
-         "\u038c",
-         "\u038e"-"\u03a1",
-         "\u03a3"-"\u03ce",
-         "\u03d0"-"\u03d7",
-         "\u03da"-"\u03f3",
-         "\u0400"-"\u0481",
-         "\u0483"-"\u0486",
-         "\u048c"-"\u04c4",
-         "\u04c7"-"\u04c8",
-         "\u04cb"-"\u04cc",
-         "\u04d0"-"\u04f5",
-         "\u04f8"-"\u04f9",
-         "\u0531"-"\u0556",
-         "\u0559",
-         "\u0561"-"\u0587",
-         "\u0591"-"\u05a1",
-         "\u05a3"-"\u05b9",
-         "\u05bb"-"\u05bd",
-         "\u05bf",
-         "\u05c1"-"\u05c2",
-         "\u05c4",
-         "\u05d0"-"\u05ea",
-         "\u05f0"-"\u05f2",
-         "\u0621"-"\u063a",
-         "\u0640"-"\u0655",
-         "\u0660"-"\u0669",
-         "\u0670"-"\u06d3",
-         "\u06d5"-"\u06dc",
-         "\u06df"-"\u06e8",
-         "\u06ea"-"\u06ed",
-         "\u06f0"-"\u06fc",
-         "\u070f"-"\u072c",
-         "\u0730"-"\u074a",
-         "\u0780"-"\u07b0",
-         "\u0901"-"\u0903",
-         "\u0905"-"\u0939",
-         "\u093c"-"\u094d",
-         "\u0950"-"\u0954",
-         "\u0958"-"\u0963",
-         "\u0966"-"\u096f",
-         "\u0981"-"\u0983",
-         "\u0985"-"\u098c",
-         "\u098f"-"\u0990",
-         "\u0993"-"\u09a8",
-         "\u09aa"-"\u09b0",
-         "\u09b2",
-         "\u09b6"-"\u09b9",
-         "\u09bc",
-         "\u09be"-"\u09c4",
-         "\u09c7"-"\u09c8",
-         "\u09cb"-"\u09cd",
-         "\u09d7",
-         "\u09dc"-"\u09dd",
-         "\u09df"-"\u09e3",
-         "\u09e6"-"\u09f3",
-         "\u0a02",
-         "\u0a05"-"\u0a0a",
-         "\u0a0f"-"\u0a10",
-         "\u0a13"-"\u0a28",
-         "\u0a2a"-"\u0a30",
-         "\u0a32"-"\u0a33",
-         "\u0a35"-"\u0a36",
-         "\u0a38"-"\u0a39",
-         "\u0a3c",
-         "\u0a3e"-"\u0a42",
-         "\u0a47"-"\u0a48",
-         "\u0a4b"-"\u0a4d",
-         "\u0a59"-"\u0a5c",
-         "\u0a5e",
-         "\u0a66"-"\u0a74",
-         "\u0a81"-"\u0a83",
-         "\u0a85"-"\u0a8b",
-         "\u0a8d",
-         "\u0a8f"-"\u0a91",
-         "\u0a93"-"\u0aa8",
-         "\u0aaa"-"\u0ab0",
-         "\u0ab2"-"\u0ab3",
-         "\u0ab5"-"\u0ab9",
-         "\u0abc"-"\u0ac5",
-         "\u0ac7"-"\u0ac9",
-         "\u0acb"-"\u0acd",
-         "\u0ad0",
-         "\u0ae0",
-         "\u0ae6"-"\u0aef",
-         "\u0b01"-"\u0b03",
-         "\u0b05"-"\u0b0c",
-         "\u0b0f"-"\u0b10",
-         "\u0b13"-"\u0b28",
-         "\u0b2a"-"\u0b30",
-         "\u0b32"-"\u0b33",
-         "\u0b36"-"\u0b39",
-         "\u0b3c"-"\u0b43",
-         "\u0b47"-"\u0b48",
-         "\u0b4b"-"\u0b4d",
-         "\u0b56"-"\u0b57",
-         "\u0b5c"-"\u0b5d",
-         "\u0b5f"-"\u0b61",
-         "\u0b66"-"\u0b6f",
-         "\u0b82"-"\u0b83",
-         "\u0b85"-"\u0b8a",
-         "\u0b8e"-"\u0b90",
-         "\u0b92"-"\u0b95",
-         "\u0b99"-"\u0b9a",
-         "\u0b9c",
-         "\u0b9e"-"\u0b9f",
-         "\u0ba3"-"\u0ba4",
-         "\u0ba8"-"\u0baa",
-         "\u0bae"-"\u0bb5",
-         "\u0bb7"-"\u0bb9",
-         "\u0bbe"-"\u0bc2",
-         "\u0bc6"-"\u0bc8",
-         "\u0bca"-"\u0bcd",
-         "\u0bd7",
-         "\u0be7"-"\u0bef",
-         "\u0c01"-"\u0c03",
-         "\u0c05"-"\u0c0c",
-         "\u0c0e"-"\u0c10",
-         "\u0c12"-"\u0c28",
-         "\u0c2a"-"\u0c33",
-         "\u0c35"-"\u0c39",
-         "\u0c3e"-"\u0c44",
-         "\u0c46"-"\u0c48",
-         "\u0c4a"-"\u0c4d",
-         "\u0c55"-"\u0c56",
-         "\u0c60"-"\u0c61",
-         "\u0c66"-"\u0c6f",
-         "\u0c82"-"\u0c83",
-         "\u0c85"-"\u0c8c",
-         "\u0c8e"-"\u0c90",
-         "\u0c92"-"\u0ca8",
-         "\u0caa"-"\u0cb3",
-         "\u0cb5"-"\u0cb9",
-         "\u0cbe"-"\u0cc4",
-         "\u0cc6"-"\u0cc8",
-         "\u0cca"-"\u0ccd",
-         "\u0cd5"-"\u0cd6",
-         "\u0cde",
-         "\u0ce0"-"\u0ce1",
-         "\u0ce6"-"\u0cef",
-         "\u0d02"-"\u0d03",
-         "\u0d05"-"\u0d0c",
-         "\u0d0e"-"\u0d10",
-         "\u0d12"-"\u0d28",
-         "\u0d2a"-"\u0d39",
-         "\u0d3e"-"\u0d43",
-         "\u0d46"-"\u0d48",
-         "\u0d4a"-"\u0d4d",
-         "\u0d57",
-         "\u0d60"-"\u0d61",
-         "\u0d66"-"\u0d6f",
-         "\u0d82"-"\u0d83",
-         "\u0d85"-"\u0d96",
-         "\u0d9a"-"\u0db1",
-         "\u0db3"-"\u0dbb",
-         "\u0dbd",
-         "\u0dc0"-"\u0dc6",
-         "\u0dca",
-         "\u0dcf"-"\u0dd4",
-         "\u0dd6",
-         "\u0dd8"-"\u0ddf",
-         "\u0df2"-"\u0df3",
-         "\u0e01"-"\u0e3a",
-         "\u0e3f"-"\u0e4e",
-         "\u0e50"-"\u0e59",
-         "\u0e81"-"\u0e82",
-         "\u0e84",
-         "\u0e87"-"\u0e88",
-         "\u0e8a",
-         "\u0e8d",
-         "\u0e94"-"\u0e97",
-         "\u0e99"-"\u0e9f",
-         "\u0ea1"-"\u0ea3",
-         "\u0ea5",
-         "\u0ea7",
-         "\u0eaa"-"\u0eab",
-         "\u0ead"-"\u0eb9",
-         "\u0ebb"-"\u0ebd",
-         "\u0ec0"-"\u0ec4",
-         "\u0ec6",
-         "\u0ec8"-"\u0ecd",
-         "\u0ed0"-"\u0ed9",
-         "\u0edc"-"\u0edd",
-         "\u0f00",
-         "\u0f18"-"\u0f19",
-         "\u0f20"-"\u0f29",
-         "\u0f35",
-         "\u0f37",
-         "\u0f39",
-         "\u0f3e"-"\u0f47",
-         "\u0f49"-"\u0f6a",
-         "\u0f71"-"\u0f84",
-         "\u0f86"-"\u0f8b",
-         "\u0f90"-"\u0f97",
-         "\u0f99"-"\u0fbc",
-         "\u0fc6",
-         "\u1000"-"\u1021",
-         "\u1023"-"\u1027",
-         "\u1029"-"\u102a",
-         "\u102c"-"\u1032",
-         "\u1036"-"\u1039",
-         "\u1040"-"\u1049",
-         "\u1050"-"\u1059",
-         "\u10a0"-"\u10c5",
-         "\u10d0"-"\u10f6",
-         "\u1100"-"\u1159",
-         "\u115f"-"\u11a2",
-         "\u11a8"-"\u11f9",
-         "\u1200"-"\u1206",
-         "\u1208"-"\u1246",
-         "\u1248",
-         "\u124a"-"\u124d",
-         "\u1250"-"\u1256",
-         "\u1258",
-         "\u125a"-"\u125d",
-         "\u1260"-"\u1286",
-         "\u1288",
-         "\u128a"-"\u128d",
-         "\u1290"-"\u12ae",
-         "\u12b0",
-         "\u12b2"-"\u12b5",
-         "\u12b8"-"\u12be",
-         "\u12c0",
-         "\u12c2"-"\u12c5",
-         "\u12c8"-"\u12ce",
-         "\u12d0"-"\u12d6",
-         "\u12d8"-"\u12ee",
-         "\u12f0"-"\u130e",
-         "\u1310",
-         "\u1312"-"\u1315",
-         "\u1318"-"\u131e",
-         "\u1320"-"\u1346",
-         "\u1348"-"\u135a",
-         "\u1369"-"\u1371",
-         "\u13a0"-"\u13f4",
-         "\u1401"-"\u166c",
-         "\u166f"-"\u1676",
-         "\u1681"-"\u169a",
-         "\u16a0"-"\u16ea",
-         "\u1780"-"\u17d3",
-         "\u17db",
-         "\u17e0"-"\u17e9",
-         "\u180b"-"\u180e",
-         "\u1810"-"\u1819",
-         "\u1820"-"\u1877",
-         "\u1880"-"\u18a9",
-         "\u1e00"-"\u1e9b",
-         "\u1ea0"-"\u1ef9",
-         "\u1f00"-"\u1f15",
-         "\u1f18"-"\u1f1d",
-         "\u1f20"-"\u1f45",
-         "\u1f48"-"\u1f4d",
-         "\u1f50"-"\u1f57",
-         "\u1f59",
-         "\u1f5b",
-         "\u1f5d",
-         "\u1f5f"-"\u1f7d",
-         "\u1f80"-"\u1fb4",
-         "\u1fb6"-"\u1fbc",
-         "\u1fbe",
-         "\u1fc2"-"\u1fc4",
-         "\u1fc6"-"\u1fcc",
-         "\u1fd0"-"\u1fd3",
-         "\u1fd6"-"\u1fdb",
-         "\u1fe0"-"\u1fec",
-         "\u1ff2"-"\u1ff4",
-         "\u1ff6"-"\u1ffc",
-         "\u200c"-"\u200f",
-         "\u202a"-"\u202e",
-         "\u203f"-"\u2040",
-         "\u206a"-"\u206f",
-         "\u207f",
-         "\u20a0"-"\u20af",
-         "\u20d0"-"\u20dc",
-         "\u20e1",
-         "\u2102",
-         "\u2107",
-         "\u210a"-"\u2113",
-         "\u2115",
-         "\u2119"-"\u211d",
-         "\u2124",
-         "\u2126",
-         "\u2128",
-         "\u212a"-"\u212d",
-         "\u212f"-"\u2131",
-         "\u2133"-"\u2139",
-         "\u2160"-"\u2183",
-         "\u3005"-"\u3007",
-         "\u3021"-"\u302f",
-         "\u3031"-"\u3035",
-         "\u3038"-"\u303a",
-         "\u3041"-"\u3094",
-         "\u3099"-"\u309a",
-         "\u309d"-"\u309e",
-         "\u30a1"-"\u30fe",
-         "\u3105"-"\u312c",
-         "\u3131"-"\u318e",
-         "\u31a0"-"\u31b7",
-         "\u3400"-"\u4db5",
-         "\u4e00"-"\u9fa5",
-         "\ua000"-"\ua48c",
-         "\uac00"-"\ud7a3",
-         "\uf900"-"\ufa2d",
-         "\ufb00"-"\ufb06",
-         "\ufb13"-"\ufb17",
-         "\ufb1d"-"\ufb28",
-         "\ufb2a"-"\ufb36",
-         "\ufb38"-"\ufb3c",
-         "\ufb3e",
-         "\ufb40"-"\ufb41",
-         "\ufb43"-"\ufb44",
-         "\ufb46"-"\ufbb1",
-         "\ufbd3"-"\ufd3d",
-         "\ufd50"-"\ufd8f",
-         "\ufd92"-"\ufdc7",
-         "\ufdf0"-"\ufdfb",
-         "\ufe20"-"\ufe23",
-         "\ufe33"-"\ufe34",
-         "\ufe4d"-"\ufe4f",
-         "\ufe69",
-         "\ufe70"-"\ufe72",
-         "\ufe74",
-         "\ufe76"-"\ufefc",
-         "\ufeff",
-         "\uff04",
-         "\uff10"-"\uff19",
-         "\uff21"-"\uff3a",
-         "\uff3f",
-         "\uff41"-"\uff5a",
-         "\uff65"-"\uffbe",
-         "\uffc2"-"\uffc7",
-         "\uffca"-"\uffcf",
-         "\uffd2"-"\uffd7",
-         "\uffda"-"\uffdc",
-         "\uffe0"-"\uffe1",
-         "\uffe5"-"\uffe6",
-         "\ufff9"-"\ufffb"
-      ]
-  >
+   < IDENTIFIER : <LETTER> ( <PART_LETTER> )* >
+ // all chars for which Character.isJavaIdentifierStart is true
+ | < #LETTER : ["$","A"-"Z","_","a"-"z","\u00a2"-"\u00a5","\u00aa","\u00b5","\u00ba",
+   "\u00c0"-"\u00d6","\u00d8"-"\u00f6","\u00f8"-"\u021f","\u0222"-"\u0233","\u0250"-"\u02ad",
+   "\u02b0"-"\u02b8","\u02bb"-"\u02c1","\u02d0"-"\u02d1","\u02e0"-"\u02e4","\u02ee","\u037a",
+   "\u0386","\u0388"-"\u038a","\u038c","\u038e"-"\u03a1","\u03a3"-"\u03ce","\u03d0"-"\u03d7",
+   "\u03da"-"\u03f3","\u0400"-"\u0481","\u048c"-"\u04c4","\u04c7"-"\u04c8","\u04cb"-"\u04cc",
+   "\u04d0"-"\u04f5","\u04f8"-"\u04f9","\u0531"-"\u0556","\u0559","\u0561"-"\u0587",
+   "\u05d0"-"\u05ea","\u05f0"-"\u05f2","\u0621"-"\u063a","\u0640"-"\u064a","\u0671"-"\u06d3",
+   "\u06d5","\u06e5"-"\u06e6","\u06fa"-"\u06fc","\u0710","\u0712"-"\u072c","\u0780"-"\u07a5",
+   "\u0905"-"\u0939","\u093d","\u0950","\u0958"-"\u0961","\u0985"-"\u098c","\u098f"-"\u0990",
+   "\u0993"-"\u09a8","\u09aa"-"\u09b0","\u09b2","\u09b6"-"\u09b9","\u09dc"-"\u09dd",
+   "\u09df"-"\u09e1","\u09f0"-"\u09f3","\u0a05"-"\u0a0a","\u0a0f"-"\u0a10","\u0a13"-"\u0a28",
+   "\u0a2a"-"\u0a30","\u0a32"-"\u0a33","\u0a35"-"\u0a36","\u0a38"-"\u0a39","\u0a59"-"\u0a5c",
+   "\u0a5e","\u0a72"-"\u0a74","\u0a85"-"\u0a8b","\u0a8d","\u0a8f"-"\u0a91","\u0a93"-"\u0aa8",
+   "\u0aaa"-"\u0ab0","\u0ab2"-"\u0ab3","\u0ab5"-"\u0ab9","\u0abd","\u0ad0","\u0ae0",
+   "\u0b05"-"\u0b0c","\u0b0f"-"\u0b10","\u0b13"-"\u0b28","\u0b2a"-"\u0b30","\u0b32"-"\u0b33",
+   "\u0b36"-"\u0b39","\u0b3d","\u0b5c"-"\u0b5d","\u0b5f"-"\u0b61","\u0b85"-"\u0b8a",
+   "\u0b8e"-"\u0b90","\u0b92"-"\u0b95","\u0b99"-"\u0b9a","\u0b9c","\u0b9e"-"\u0b9f",
+   "\u0ba3"-"\u0ba4","\u0ba8"-"\u0baa","\u0bae"-"\u0bb5","\u0bb7"-"\u0bb9","\u0c05"-"\u0c0c",
+   "\u0c0e"-"\u0c10","\u0c12"-"\u0c28","\u0c2a"-"\u0c33","\u0c35"-"\u0c39","\u0c60"-"\u0c61",
+   "\u0c85"-"\u0c8c","\u0c8e"-"\u0c90","\u0c92"-"\u0ca8","\u0caa"-"\u0cb3","\u0cb5"-"\u0cb9",
+   "\u0cde","\u0ce0"-"\u0ce1","\u0d05"-"\u0d0c","\u0d0e"-"\u0d10","\u0d12"-"\u0d28",
+   "\u0d2a"-"\u0d39","\u0d60"-"\u0d61","\u0d85"-"\u0d96","\u0d9a"-"\u0db1","\u0db3"-"\u0dbb",
+   "\u0dbd","\u0dc0"-"\u0dc6","\u0e01"-"\u0e30","\u0e32"-"\u0e33","\u0e3f"-"\u0e46",
+   "\u0e81"-"\u0e82","\u0e84","\u0e87"-"\u0e88","\u0e8a","\u0e8d","\u0e94"-"\u0e97",
+   "\u0e99"-"\u0e9f","\u0ea1"-"\u0ea3","\u0ea5","\u0ea7","\u0eaa"-"\u0eab","\u0ead"-"\u0eb0",
+   "\u0eb2"-"\u0eb3","\u0ebd","\u0ec0"-"\u0ec4","\u0ec6","\u0edc"-"\u0edd","\u0f00",
+   "\u0f40"-"\u0f47","\u0f49"-"\u0f6a","\u0f88"-"\u0f8b","\u1000"-"\u1021","\u1023"-"\u1027",
+   "\u1029"-"\u102a","\u1050"-"\u1055","\u10a0"-"\u10c5","\u10d0"-"\u10f6","\u1100"-"\u1159",
+   "\u115f"-"\u11a2","\u11a8"-"\u11f9","\u1200"-"\u1206","\u1208"-"\u1246","\u1248",
+   "\u124a"-"\u124d","\u1250"-"\u1256","\u1258","\u125a"-"\u125d","\u1260"-"\u1286","\u1288",
+   "\u128a"-"\u128d","\u1290"-"\u12ae","\u12b0","\u12b2"-"\u12b5","\u12b8"-"\u12be","\u12c0",
+   "\u12c2"-"\u12c5","\u12c8"-"\u12ce","\u12d0"-"\u12d6","\u12d8"-"\u12ee","\u12f0"-"\u130e",
+   "\u1310","\u1312"-"\u1315","\u1318"-"\u131e","\u1320"-"\u1346","\u1348"-"\u135a",
+   "\u13a0"-"\u13f4","\u1401"-"\u166c","\u166f"-"\u1676","\u1681"-"\u169a","\u16a0"-"\u16ea",
+   "\u1780"-"\u17b3","\u17db","\u1820"-"\u1877","\u1880"-"\u18a8","\u1e00"-"\u1e9b",
+   "\u1ea0"-"\u1ef9","\u1f00"-"\u1f15","\u1f18"-"\u1f1d","\u1f20"-"\u1f45","\u1f48"-"\u1f4d",
+   "\u1f50"-"\u1f57","\u1f59","\u1f5b","\u1f5d","\u1f5f"-"\u1f7d","\u1f80"-"\u1fb4",
+   "\u1fb6"-"\u1fbc","\u1fbe","\u1fc2"-"\u1fc4","\u1fc6"-"\u1fcc","\u1fd0"-"\u1fd3",
+   "\u1fd6"-"\u1fdb","\u1fe0"-"\u1fec","\u1ff2"-"\u1ff4","\u1ff6"-"\u1ffc","\u203f"-"\u2040",
+   "\u207f","\u20a0"-"\u20af","\u2102","\u2107","\u210a"-"\u2113","\u2115","\u2119"-"\u211d",
+   "\u2124","\u2126","\u2128","\u212a"-"\u212d","\u212f"-"\u2131","\u2133"-"\u2139",
+   "\u2160"-"\u2183","\u3005"-"\u3007","\u3021"-"\u3029","\u3031"-"\u3035","\u3038"-"\u303a",
+   "\u3041"-"\u3094","\u309d"-"\u309e","\u30a1"-"\u30fe","\u3105"-"\u312c","\u3131"-"\u318e",
+   "\u31a0"-"\u31b7","\u3400"-"\u4db5","\u4e00"-"\u9fa5","\ua000"-"\ua48c","\uac00"-"\ud7a3",
+   "\uf900"-"\ufa2d","\ufb00"-"\ufb06","\ufb13"-"\ufb17","\ufb1d","\ufb1f"-"\ufb28",
+   "\ufb2a"-"\ufb36","\ufb38"-"\ufb3c","\ufb3e","\ufb40"-"\ufb41","\ufb43"-"\ufb44",
+   "\ufb46"-"\ufbb1","\ufbd3"-"\ufd3d","\ufd50"-"\ufd8f","\ufd92"-"\ufdc7","\ufdf0"-"\ufdfb",
+   "\ufe33"-"\ufe34","\ufe4d"-"\ufe4f","\ufe69","\ufe70"-"\ufe72","\ufe74","\ufe76"-"\ufefc",
+   "\uff04","\uff21"-"\uff3a","\uff3f","\uff41"-"\uff5a","\uff65"-"\uffbe","\uffc2"-"\uffc7",
+   "\uffca"-"\uffcf","\uffd2"-"\uffd7","\uffda"-"\uffdc","\uffe0"-"\uffe1","\uffe5"-"\uffe6"]>
+
+
+ // all chars for which Character.isJavaIdentifierPart is true
+ | < #PART_LETTER: ["\u0000"-"\b","\u000e"-"\u001b","$","0"-"9","A"-"Z","_","a"-"z",
+   "\u007f"-"\u009f","\u00a2"-"\u00a5","\u00aa","\u00b5","\u00ba","\u00c0"-"\u00d6",
+   "\u00d8"-"\u00f6","\u00f8"-"\u021f","\u0222"-"\u0233","\u0250"-"\u02ad","\u02b0"-"\u02b8",
+   "\u02bb"-"\u02c1","\u02d0"-"\u02d1","\u02e0"-"\u02e4","\u02ee","\u0300"-"\u034e",
+   "\u0360"-"\u0362","\u037a","\u0386","\u0388"-"\u038a","\u038c","\u038e"-"\u03a1",
+   "\u03a3"-"\u03ce","\u03d0"-"\u03d7","\u03da"-"\u03f3","\u0400"-"\u0481","\u0483"-"\u0486",
+   "\u048c"-"\u04c4","\u04c7"-"\u04c8","\u04cb"-"\u04cc","\u04d0"-"\u04f5","\u04f8"-"\u04f9",
+   "\u0531"-"\u0556","\u0559","\u0561"-"\u0587","\u0591"-"\u05a1","\u05a3"-"\u05b9",
+   "\u05bb"-"\u05bd","\u05bf","\u05c1"-"\u05c2","\u05c4","\u05d0"-"\u05ea","\u05f0"-"\u05f2",
+   "\u0621"-"\u063a","\u0640"-"\u0655","\u0660"-"\u0669","\u0670"-"\u06d3","\u06d5"-"\u06dc",
+   "\u06df"-"\u06e8","\u06ea"-"\u06ed","\u06f0"-"\u06fc","\u070f"-"\u072c","\u0730"-"\u074a",
+   "\u0780"-"\u07b0","\u0901"-"\u0903","\u0905"-"\u0939","\u093c"-"\u094d","\u0950"-"\u0954",
+   "\u0958"-"\u0963","\u0966"-"\u096f","\u0981"-"\u0983","\u0985"-"\u098c","\u098f"-"\u0990",
+   "\u0993"-"\u09a8","\u09aa"-"\u09b0","\u09b2","\u09b6"-"\u09b9","\u09bc","\u09be"-"\u09c4",
+   "\u09c7"-"\u09c8","\u09cb"-"\u09cd","\u09d7","\u09dc"-"\u09dd","\u09df"-"\u09e3",
+   "\u09e6"-"\u09f3","\u0a02","\u0a05"-"\u0a0a","\u0a0f"-"\u0a10","\u0a13"-"\u0a28",
+   "\u0a2a"-"\u0a30","\u0a32"-"\u0a33","\u0a35"-"\u0a36","\u0a38"-"\u0a39","\u0a3c",
+   "\u0a3e"-"\u0a42","\u0a47"-"\u0a48","\u0a4b"-"\u0a4d","\u0a59"-"\u0a5c","\u0a5e",
+   "\u0a66"-"\u0a74","\u0a81"-"\u0a83","\u0a85"-"\u0a8b","\u0a8d","\u0a8f"-"\u0a91",
+   "\u0a93"-"\u0aa8","\u0aaa"-"\u0ab0","\u0ab2"-"\u0ab3","\u0ab5"-"\u0ab9","\u0abc"-"\u0ac5",
+   "\u0ac7"-"\u0ac9","\u0acb"-"\u0acd","\u0ad0","\u0ae0","\u0ae6"-"\u0aef","\u0b01"-"\u0b03",
+   "\u0b05"-"\u0b0c","\u0b0f"-"\u0b10","\u0b13"-"\u0b28","\u0b2a"-"\u0b30","\u0b32"-"\u0b33",
+   "\u0b36"-"\u0b39","\u0b3c"-"\u0b43","\u0b47"-"\u0b48","\u0b4b"-"\u0b4d","\u0b56"-"\u0b57",
+   "\u0b5c"-"\u0b5d","\u0b5f"-"\u0b61","\u0b66"-"\u0b6f","\u0b82"-"\u0b83","\u0b85"-"\u0b8a",
+   "\u0b8e"-"\u0b90","\u0b92"-"\u0b95","\u0b99"-"\u0b9a","\u0b9c","\u0b9e"-"\u0b9f",
+   "\u0ba3"-"\u0ba4","\u0ba8"-"\u0baa","\u0bae"-"\u0bb5","\u0bb7"-"\u0bb9","\u0bbe"-"\u0bc2",
+   "\u0bc6"-"\u0bc8","\u0bca"-"\u0bcd","\u0bd7","\u0be7"-"\u0bef","\u0c01"-"\u0c03",
+   "\u0c05"-"\u0c0c","\u0c0e"-"\u0c10","\u0c12"-"\u0c28","\u0c2a"-"\u0c33","\u0c35"-"\u0c39",
+   "\u0c3e"-"\u0c44","\u0c46"-"\u0c48","\u0c4a"-"\u0c4d","\u0c55"-"\u0c56","\u0c60"-"\u0c61",
+   "\u0c66"-"\u0c6f","\u0c82"-"\u0c83","\u0c85"-"\u0c8c","\u0c8e"-"\u0c90","\u0c92"-"\u0ca8",
+   "\u0caa"-"\u0cb3","\u0cb5"-"\u0cb9","\u0cbe"-"\u0cc4","\u0cc6"-"\u0cc8","\u0cca"-"\u0ccd",
+   "\u0cd5"-"\u0cd6","\u0cde","\u0ce0"-"\u0ce1","\u0ce6"-"\u0cef","\u0d02"-"\u0d03",
+   "\u0d05"-"\u0d0c","\u0d0e"-"\u0d10","\u0d12"-"\u0d28","\u0d2a"-"\u0d39","\u0d3e"-"\u0d43",
+   "\u0d46"-"\u0d48","\u0d4a"-"\u0d4d","\u0d57","\u0d60"-"\u0d61","\u0d66"-"\u0d6f",
+   "\u0d82"-"\u0d83","\u0d85"-"\u0d96","\u0d9a"-"\u0db1","\u0db3"-"\u0dbb","\u0dbd",
+   "\u0dc0"-"\u0dc6","\u0dca","\u0dcf"-"\u0dd4","\u0dd6","\u0dd8"-"\u0ddf","\u0df2"-"\u0df3",
+   "\u0e01"-"\u0e3a","\u0e3f"-"\u0e4e","\u0e50"-"\u0e59","\u0e81"-"\u0e82","\u0e84",
+   "\u0e87"-"\u0e88","\u0e8a","\u0e8d","\u0e94"-"\u0e97","\u0e99"-"\u0e9f","\u0ea1"-"\u0ea3",
+   "\u0ea5","\u0ea7","\u0eaa"-"\u0eab","\u0ead"-"\u0eb9","\u0ebb"-"\u0ebd","\u0ec0"-"\u0ec4",
+   "\u0ec6","\u0ec8"-"\u0ecd","\u0ed0"-"\u0ed9","\u0edc"-"\u0edd","\u0f00","\u0f18"-"\u0f19",
+   "\u0f20"-"\u0f29","\u0f35","\u0f37","\u0f39","\u0f3e"-"\u0f47","\u0f49"-"\u0f6a",
+   "\u0f71"-"\u0f84","\u0f86"-"\u0f8b","\u0f90"-"\u0f97","\u0f99"-"\u0fbc","\u0fc6",
+   "\u1000"-"\u1021","\u1023"-"\u1027","\u1029"-"\u102a","\u102c"-"\u1032","\u1036"-"\u1039",
+   "\u1040"-"\u1049","\u1050"-"\u1059","\u10a0"-"\u10c5","\u10d0"-"\u10f6","\u1100"-"\u1159",
+   "\u115f"-"\u11a2","\u11a8"-"\u11f9","\u1200"-"\u1206","\u1208"-"\u1246","\u1248",
+   "\u124a"-"\u124d","\u1250"-"\u1256","\u1258","\u125a"-"\u125d","\u1260"-"\u1286",
+   "\u1288","\u128a"-"\u128d","\u1290"-"\u12ae","\u12b0","\u12b2"-"\u12b5","\u12b8"-"\u12be",
+   "\u12c0","\u12c2"-"\u12c5","\u12c8"-"\u12ce","\u12d0"-"\u12d6","\u12d8"-"\u12ee",
+   "\u12f0"-"\u130e","\u1310","\u1312"-"\u1315","\u1318"-"\u131e","\u1320"-"\u1346",
+   "\u1348"-"\u135a","\u1369"-"\u1371","\u13a0"-"\u13f4","\u1401"-"\u166c","\u166f"-"\u1676",
+   "\u1681"-"\u169a","\u16a0"-"\u16ea","\u1780"-"\u17d3","\u17db","\u17e0"-"\u17e9",
+   "\u180b"-"\u180e","\u1810"-"\u1819","\u1820"-"\u1877","\u1880"-"\u18a9","\u1e00"-"\u1e9b",
+   "\u1ea0"-"\u1ef9","\u1f00"-"\u1f15","\u1f18"-"\u1f1d","\u1f20"-"\u1f45","\u1f48"-"\u1f4d",
+   "\u1f50"-"\u1f57","\u1f59","\u1f5b","\u1f5d","\u1f5f"-"\u1f7d","\u1f80"-"\u1fb4",
+   "\u1fb6"-"\u1fbc","\u1fbe","\u1fc2"-"\u1fc4","\u1fc6"-"\u1fcc","\u1fd0"-"\u1fd3",
+   "\u1fd6"-"\u1fdb","\u1fe0"-"\u1fec","\u1ff2"-"\u1ff4","\u1ff6"-"\u1ffc","\u200c"-"\u200f",
+   "\u202a"-"\u202e","\u203f"-"\u2040","\u206a"-"\u206f","\u207f","\u20a0"-"\u20af",
+   "\u20d0"-"\u20dc","\u20e1","\u2102","\u2107","\u210a"-"\u2113","\u2115","\u2119"-"\u211d",
+   "\u2124","\u2126","\u2128","\u212a"-"\u212d","\u212f"-"\u2131","\u2133"-"\u2139",
+   "\u2160"-"\u2183","\u3005"-"\u3007","\u3021"-"\u302f","\u3031"-"\u3035","\u3038"-"\u303a",
+   "\u3041"-"\u3094","\u3099"-"\u309a","\u309d"-"\u309e","\u30a1"-"\u30fe","\u3105"-"\u312c",
+   "\u3131"-"\u318e","\u31a0"-"\u31b7","\u3400"-"\u4db5","\u4e00"-"\u9fa5","\ua000"-"\ua48c",
+   "\uac00"-"\ud7a3","\uf900"-"\ufa2d","\ufb00"-"\ufb06","\ufb13"-"\ufb17","\ufb1d"-"\ufb28",
+   "\ufb2a"-"\ufb36","\ufb38"-"\ufb3c","\ufb3e","\ufb40"-"\ufb41","\ufb43"-"\ufb44",
+   "\ufb46"-"\ufbb1","\ufbd3"-"\ufd3d","\ufd50"-"\ufd8f","\ufd92"-"\ufdc7","\ufdf0"-"\ufdfb",
+   "\ufe20"-"\ufe23","\ufe33"-"\ufe34","\ufe4d"-"\ufe4f","\ufe69","\ufe70"-"\ufe72","\ufe74",
+   "\ufe76"-"\ufefc","\ufeff","\uff04","\uff10"-"\uff19","\uff21"-"\uff3a","\uff3f",
+   "\uff41"-"\uff5a","\uff65"-"\uffbe","\uffc2"-"\uffc7","\uffca"-"\uffcf","\uffd2"-"\uffd7",
+   "\uffda"-"\uffdc","\uffe0"-"\uffe1","\uffe5"-"\uffe6","\ufff9"-"\ufffb"]>
 }
 
 /* SEPARATORS */
@@ -1290,6 +1049,7 @@ TOKEN :
 | < XOR: "^" >
 | < REM: "%" >
 | < LSHIFT: "<<" >
+// Notice the absence of >> or >>>, to not conflict with generics
 | < PLUSASSIGN: "+=" >
 | < MINUSASSIGN: "-=" >
 | < STARASSIGN: "*=" >
@@ -1339,16 +1099,26 @@ ASTCompilationUnit CompilationUnit() :
 {
   [ LOOKAHEAD( ( Annotation() )* "package" ) PackageDeclaration() ( EmptyStatement() )* ]
   ( ImportDeclaration() ( EmptyStatement() )* )*
-  ( LOOKAHEAD(2) TypeDeclaration() ( EmptyStatement() )* )*
-  [ LOOKAHEAD({isKeyword("open") || isKeyword("module") || getToken(1).kind == AT}) ModuleDeclaration() ( EmptyStatement() )* ]
+  // the module decl lookahead needs to be before the type declaration branch,
+  // looking for annotations + "open" | "module" will fail faster if it's *not*
+  // a module (most common case)
+  [ LOOKAHEAD(ModuleDeclLahead()) ModuleDeclaration() ( EmptyStatement() )* ]
+  ( TypeDeclaration() ( EmptyStatement() )* )*
   ( < "\u001a" > )?
-  ( < "~[]" > )?
+  ( < "~[]" > )? // what's this for? Do you mean ( < ~[] > )*, i.e. "any character"?
   <EOF>
+  {
+     jjtThis.setComments(token_source.comments);
+     return jjtThis;
+  }
+}
+
+private void ModuleDeclLahead() #void:
+{}
 {
- jjtThis.setComments(token_source.comments);
- return jjtThis;
+  (Annotation())* LOOKAHEAD({isKeyword("open") || isKeyword("module")}) <IDENTIFIER>
 }
-}
+
 
 void PackageDeclaration() :
 {}
@@ -1387,6 +1157,8 @@ int Modifiers() #void:
   | "volatile" { modifiers |= AccessNode.VOLATILE; }
   | "strictfp" { modifiers |= AccessNode.STRICTFP; }
   | "default" { modifiers |= AccessNode.DEFAULT; checkForBadDefaultImplementationUsage(); }
+  | LOOKAHEAD({isKeyword("sealed")}) <IDENTIFIER> { modifiers |= AccessNode.SEALED; checkForSealedClassUsage(); }
+  | LOOKAHEAD({isNonSealedModifier()}) <IDENTIFIER> <MINUS> <IDENTIFIER> { modifiers |= AccessNode.NON_SEALED; checkForSealedClassUsage(); }
   | Annotation()
   )
  )*
@@ -1410,6 +1182,8 @@ void TypeDeclaration():
      LOOKAHEAD({isKeyword("enum")}) EnumDeclaration(modifiers)
    |
      AnnotationTypeDeclaration(modifiers)
+   |
+     LOOKAHEAD({isKeyword("record")}) RecordDeclaration(modifiers)
   )
 }
 
@@ -1421,12 +1195,12 @@ void ClassOrInterfaceDeclaration(int modifiers):
     inInterface = false;
 }
 {
-  ( /* See note about this optional final modifier in BlockStatement */
-    ["final"|"abstract"] "class" | "interface" { jjtThis.setInterface(); inInterface = true; } )
-  t=<IDENTIFIER> { jjtThis.setImage(t.image); }
+  ( "class" | "interface" { jjtThis.setInterface(); inInterface = true; } )
+  t=<IDENTIFIER> { checkForBadTypeIdentifierUsage(t.image); jjtThis.setImage(t.image); }
   [ TypeParameters() ]
   [ ExtendsList() ]
   [ ImplementsList() ]
+  [ LOOKAHEAD({isKeyword("permits")}) PermittedSubclasses() ]
   ClassOrInterfaceBody()
   { inInterface = inInterfaceOld; } // always restore the flag after leaving the node
 }
@@ -1436,15 +1210,30 @@ void ExtendsList():
    boolean extendsMoreThanOne = false;
 }
 {
-   "extends" (Annotation() {checkForBadTypeAnnotations();})* ClassOrInterfaceType()
-   ( "," (Annotation() {checkForBadTypeAnnotations();})* ClassOrInterfaceType() { extendsMoreThanOne = true; } )*
+   "extends" (TypeAnnotation())* ClassOrInterfaceType()
+   ( "," (TypeAnnotation())* ClassOrInterfaceType() { extendsMoreThanOne = true; } )*
 }
 
 void ImplementsList():
 {}
 {
-   "implements" (Annotation() {checkForBadTypeAnnotations();})* ClassOrInterfaceType()
-   ( "," (Annotation() {checkForBadTypeAnnotations();})* ClassOrInterfaceType() )*
+   "implements" (TypeAnnotation())* ClassOrInterfaceType()
+   ( "," (TypeAnnotation())* ClassOrInterfaceType() )*
+}
+
+void PermittedSubclasses() #PermitsList:
+{
+    Token t;
+    checkForSealedClassUsage();
+}
+{
+    t = <IDENTIFIER> {
+        if (!"permits".equals(t.image)) {
+          throw new ParseException("ERROR: expecting permits");
+        }
+    }
+    TypeName()
+    ( "," TypeName() )*
 }
 
 void EnumDeclaration(int modifiers):
@@ -1455,7 +1244,7 @@ jjtThis.setModifiers(modifiers);
 }
 {
   t = <IDENTIFIER> {
-    if (!t.image.equals("enum")) {
+    if (!"enum".equals(t.image)) {
       throw new ParseException("ERROR: expecting enum");
     }
 
@@ -1463,7 +1252,7 @@ jjtThis.setModifiers(modifiers);
       throw new ParseException("ERROR: Can't use enum as a keyword in pre-JDK 1.5 target");
     }
   }
-  t=<IDENTIFIER> {jjtThis.setImage(t.image);}
+  t=<IDENTIFIER> {checkForBadTypeIdentifierUsage(t.image); jjtThis.setImage(t.image);}
   [ ImplementsList() ]
   EnumBody()
 }
@@ -1489,6 +1278,84 @@ void EnumConstant():
   t=<IDENTIFIER> {jjtThis.setImage(t.image);} [ Arguments() ] [ ClassOrInterfaceBody() ]
 }
 
+void RecordDeclaration(int modifiers):
+{
+    Token t;
+    jjtThis.setModifiers(modifiers);
+    checkForRecordType();
+}
+{
+  t = <IDENTIFIER> {
+    if (!"record".equals(t.image)) {
+      throw new ParseException("ERROR: expecting record");
+    }
+  }
+  t=<IDENTIFIER> {checkForBadTypeIdentifierUsage(t.image); jjtThis.setImage(t.image);}
+  [ TypeParameters() ]
+  RecordHeader()
+  [ ImplementsList() ]
+  RecordBody()
+}
+
+void RecordHeader() #void:
+{}
+{
+  "(" RecordComponentList() ")"
+}
+
+void RecordComponentList() :
+{}
+{
+  [ RecordComponent() ("," RecordComponent())* ]
+}
+
+void RecordComponent():
+{}
+{
+  (RecordComponentModifier())*
+  Type()
+  [ "..." {jjtThis.setVarargs();} ]
+  VariableDeclaratorId()
+}
+
+void RecordComponentModifier() #void:
+{}
+{
+  Annotation()
+}
+
+void RecordBody():
+{}
+{
+  "{"
+    ( RecordBodyDeclaration() )*
+  "}"
+}
+
+void RecordBodyDeclaration() #void :
+{}
+{
+  LOOKAHEAD(CompactConstructorDeclarationLookahead()) CompactConstructorDeclaration()
+  |
+  ClassOrInterfaceBodyDeclaration()
+}
+
+private void CompactConstructorDeclarationLookahead() #void:
+{}
+{
+    Modifiers() <IDENTIFIER> "{"
+}
+
+void CompactConstructorDeclaration():
+{
+  int modifiers;
+}
+{
+  modifiers = Modifiers() { jjtThis.setModifiers(modifiers); }
+  <IDENTIFIER> { jjtThis.setImage(token.image); }
+  Block()
+}
+
 void TypeParameters():
 {}
 {
@@ -1498,14 +1365,14 @@ void TypeParameters():
 void TypeParameter():
 {Token t;}
 {
-   (Annotation() {checkForBadTypeAnnotations();})*
+   (TypeAnnotation())*
    t=<IDENTIFIER> {jjtThis.setImage(t.image);} [ TypeBound() ]
 }
 
 void TypeBound():
 {}
 {
-   "extends" (Annotation() {checkForBadTypeAnnotations();})* ClassOrInterfaceType() ( "&" (Annotation() {checkForBadTypeAnnotations();})* ClassOrInterfaceType() )*
+   "extends" (TypeAnnotation())* ClassOrInterfaceType() ( "&" (TypeAnnotation())* ClassOrInterfaceType() )*
 }
 
 void ClassOrInterfaceBody():
@@ -1522,6 +1389,7 @@ void ClassOrInterfaceBodyDeclaration():
 |  modifiers = Modifiers()
   ( LOOKAHEAD(3) ClassOrInterfaceDeclaration(modifiers)
     | LOOKAHEAD({isKeyword("enum")}) EnumDeclaration(modifiers)
+    | LOOKAHEAD({isKeyword("record")}) RecordDeclaration(modifiers)
     | LOOKAHEAD( [ TypeParameters() ] <IDENTIFIER> "(" ) ConstructorDeclaration(modifiers)
     | LOOKAHEAD( Type() <IDENTIFIER> ( "[" "]" )* ( "," | "=" | ";" ) )  FieldDeclaration(modifiers)
     | LOOKAHEAD(2) MethodDeclaration(modifiers)
@@ -1582,7 +1450,7 @@ void MethodDeclaration(int modifiers) :
 }
 {
   [ TypeParameters() ]
-  (Annotation() {checkForBadTypeAnnotations();})* ResultType() MethodDeclarator() [ "throws" NameList() ]
+  (TypeAnnotation())* ResultType() MethodDeclarator() [ "throws" NameList() ]
   ( Block() | ";" )
 }
 
@@ -1620,7 +1488,7 @@ void ConstructorDeclaration(int modifiers) :
 Token t;}
 {
     [ TypeParameters() ]
-  <IDENTIFIER> FormalParameters() [ "throws" NameList() ]
+   <IDENTIFIER>  {jjtThis.setImage(getToken(0).getImage());} FormalParameters() [ "throws" NameList() ]
   "{"
     [ LOOKAHEAD(ExplicitConstructorInvocation()) ExplicitConstructorInvocation() ]
     ( BlockStatement() )*
@@ -1646,21 +1514,27 @@ void Initializer() :
 
 /*
  * Type, name and expression syntax follows.
+ * Type is the same as "UnannType" in JLS
+ *
+ * See https://docs.oracle.com/javase/specs/jls/se10/html/jls-8.html#jls-UnannType
  */
 void Type():
-{}
 {
-   LOOKAHEAD(2) ReferenceType()
- |
-   PrimitiveType()
+    Token t;
+}
+{
+ LOOKAHEAD(2) ReferenceType()
+ | PrimitiveType()
 }
 
 void ReferenceType():
 {}
 {
-   PrimitiveType() (Annotation() {checkForBadTypeAnnotations();})* ( LOOKAHEAD(2) "[" "]" { jjtThis.bumpArrayDepth(); })+
+  // The grammar here is mildly wrong, the annotations can be before each []
+  // This will wait for #997
+   PrimitiveType() (TypeAnnotation())* ( LOOKAHEAD(2) "[" "]" { jjtThis.bumpArrayDepth(); })+
   |
-   ( ClassOrInterfaceType()) (Annotation() {checkForBadTypeAnnotations();})* ( LOOKAHEAD(2) "[" "]" { jjtThis.bumpArrayDepth(); })*
+   ( ClassOrInterfaceType()) (TypeAnnotation())* ( LOOKAHEAD(2) "[" "]" { jjtThis.bumpArrayDepth(); })*
 }
 
 void ClassOrInterfaceType():
@@ -1675,6 +1549,17 @@ void ClassOrInterfaceType():
   {jjtThis.setImage(s.toString());}
 }
 
+void TypeName() #ClassOrInterfaceType:
+{
+  StringBuilder s = new StringBuilder();
+  Token t;
+}
+{
+    t=<IDENTIFIER> {s.append(t.image);}
+    ( "." t=<IDENTIFIER> {s.append('.').append(t.image);} )*
+    {jjtThis.setImage(s.toString());}
+}
+
 void TypeArguments():
 {}
 {
@@ -1687,13 +1572,13 @@ void TypeArguments():
 void TypeArgument():
 {}
 {
-   (Annotation() {checkForBadTypeAnnotations();})* (ReferenceType() | "?" [ WildcardBounds() ])
+   (TypeAnnotation())* (ReferenceType() | "?" [ WildcardBounds() ])
 }
 
 void WildcardBounds():
 {}
 {
-   ("extends" | "super") (Annotation() {checkForBadTypeAnnotations();})* ReferenceType()
+   ("extends" | "super") (TypeAnnotation())* ReferenceType()
 }
 
 void PrimitiveType() :
@@ -1739,8 +1624,8 @@ void Name() :
 void NameList() :
 {}
 {
-  (Annotation() {checkForBadTypeAnnotations();})* Name()
-  ( "," (Annotation() {checkForBadTypeAnnotations();})* Name()
+  (TypeAnnotation())* Name()
+  ( "," (TypeAnnotation())* Name()
   )*
 }
 
@@ -1759,6 +1644,14 @@ void Expression() :
  * a primary expression.  Consider adding a semantic predicate to work
  * around this.
  */
+ // It also allows lambda expressions in many more contexts as allowed by the JLS.
+ // Lambda expressions are not a PrimaryExpression in the JLS, instead they're
+ // separated from the AssignmentExpression production. Their use is restricted
+ // to method and constructor argument, cast operand, and the RHS of assignments.
+ // https://docs.oracle.com/javase/specs/jls/se9/html/jls-15.html#jls-15.27
+ //
+ // To prevent LambdaExpressions in switch labels, the field #inSwitchLabel is used
+ // as a workaround.
 {}
 {
   ConditionalExpression()
@@ -1784,10 +1677,12 @@ void AssignmentOperator() :
     | "|="    {jjtThis.setImage("|="); jjtThis.setCompound();}
 }
 
+// TODO Setting isTernary is unnecessary, since the node is only pushed on the stack if there is at least one child,
+// ie if it's a ternary
 void ConditionalExpression() #ConditionalExpression(>1) :
 {}
 {
-  ConditionalOrExpression() [ LOOKAHEAD(2) "?" {jjtThis.setTernary();} Expression() ":" ConditionalExpression() ]
+  ConditionalOrExpression() [ LOOKAHEAD(2) "?" Expression() ":" ConditionalExpression() ]
 }
 
 void ConditionalOrExpression() #ConditionalOrExpression(>1):
@@ -1826,10 +1721,26 @@ void EqualityExpression() #EqualityExpression(>1):
   InstanceOfExpression()  ( LOOKAHEAD(2) ( "==" {jjtThis.setImage("==");} | "!=" {jjtThis.setImage("!=");} ) InstanceOfExpression()  )*
 }
 
+void TypePattern():
+{}
+{
+  ( "final" {jjtThis.setFinal(true);} | Annotation() )*
+  Type()
+  VariableDeclaratorId()
+}
+
 void InstanceOfExpression() #InstanceOfExpression(>1):
 {}
 {
-  RelationalExpression() [ LOOKAHEAD(2) "instanceof" Type() ]
+  RelationalExpression()
+  [ "instanceof"
+      (
+        LOOKAHEAD("final" | "@") {checkforBadInstanceOfPattern();} TypePattern()
+      |
+        Type()
+        [ {checkforBadInstanceOfPattern();} VariableDeclaratorId() #TypePattern(2) ]
+      )
+  ]
 }
 
 void RelationalExpression() #RelationalExpression(>1):
@@ -1847,11 +1758,11 @@ void RelationalExpression() #RelationalExpression(>1):
 void ShiftExpression() #ShiftExpression(>1):
 {}
 {
-  AdditiveExpression() 
+  AdditiveExpression()
    ( LOOKAHEAD(2)
     ( "<<" { jjtThis.setImage("<<");}
-     | RSIGNEDSHIFT()
-     | RUNSIGNEDSHIFT()
+     | RSIGNEDSHIFT() { jjtThis.setImage(">>"); }
+     | RUNSIGNEDSHIFT() { jjtThis.setImage(">>>"); }
     ) AdditiveExpression() )*
 }
 
@@ -1893,13 +1804,26 @@ void UnaryExpressionNotPlusMinus() #UnaryExpressionNotPlusMinus((jjtn000.getImag
 {
  ( "~" {jjtThis.setImage("~");} | "!" {jjtThis.setImage("!");} ) UnaryExpression()
 /*
- * This is really ugly... we are repeting the CastExpression lookahead and full expression...
+ * This is really ugly... we are repeating the CastExpression lookahead and full expression...
  * If we don't the lookahead within CastExpression is ignored, and it simply looks for the expression,
- * meaning we can't be explicit as to what can be casted depending on the cast type (primitive or otherwhise)
+ * meaning we can't be explicit as to what can be casted depending on the cast type (primitive or otherwise)
 */
 | LOOKAHEAD("(" (Annotation())* PrimitiveType() ")") CastExpression()
-| LOOKAHEAD("(" (Annotation())* Type() ( "&" ReferenceType() )* ")" UnaryExpressionNotPlusMinus()) CastExpression()
-| PostfixExpression()
+| LOOKAHEAD("(" (Annotation())* Type() ( "&" ReferenceType() )* ")" UnaryExprNotPmStart()) CastExpression()
+| PostfixExpression() // this may be a parenthesized expr, which is why we have lookaheads
+| SwitchExpression()
+}
+
+
+private void UnaryExprNotPmStart() #void:
+{}
+{
+   //  Condensed FIRST set of UnaryExpressionNotPlusMinus
+   //  Avoid looking ahead for a whole UnaryExpressionNotPlusMinus, but just for a token
+
+   "~" | "!" | "(" | "switch" | "new" | "this" | "super" | Literal() | "@"
+   | <IDENTIFIER>
+   | "void" | PrimitiveType()
 }
 
 void PostfixExpression() #PostfixExpression((jjtn000.getImage() != null)):
@@ -1913,8 +1837,18 @@ void CastExpression() :
 {
   LOOKAHEAD(
     "(" (Annotation())* PrimitiveType() ")"
-  ) "(" (Annotation() {checkForBadTypeAnnotations();})* Type() ")" UnaryExpression()
-| "(" (Annotation() {checkForBadTypeAnnotations();})* Type() ( "&" {checkForBadIntersectionTypesInCasts(); jjtThis.setIntersectionTypes(true);} ReferenceType() )* ")" UnaryExpressionNotPlusMinus()
+  ) "(" (TypeAnnotation())* Type() ")" UnaryExpression()
+| "(" (TypeAnnotation())* Type() ( "&" {checkForBadIntersectionTypesInCasts(); jjtThis.setIntersectionTypes(true);} ReferenceType() )* ")" UnaryExpressionNotPlusMinus()
+}
+
+void SwitchExpression() :
+{boolean prevInSwitchBlock = inSwitchExprBlock;}
+{
+    {checkForSwitchExpression();}
+    "switch" "(" Expression() ")"
+    {inSwitchExprBlock = true;}
+    SwitchBlock()
+    {inSwitchExprBlock = prevInSwitchBlock;}
 }
 
 void PrimaryExpression() :
@@ -1944,9 +1878,9 @@ void PrimaryPrefix() :
   Literal()
 | LOOKAHEAD(2) "this" {jjtThis.setUsesThisModifier();}
 | "super" {jjtThis.setUsesSuperModifier();}
-| LOOKAHEAD( <IDENTIFIER> "->" ) LambdaExpression()
-| LOOKAHEAD( "(" VariableDeclaratorId() ( "," VariableDeclaratorId() )* ")" "->" ) LambdaExpression()
-| LOOKAHEAD( FormalParameters() "->" ) LambdaExpression()
+| LOOKAHEAD( <IDENTIFIER> "->", {!inSwitchLabel} ) LambdaExpression()
+| LOOKAHEAD( "(" VariableDeclaratorId() ( "," VariableDeclaratorId() )* ")" "->", {!inSwitchLabel} ) LambdaExpression()
+| LOOKAHEAD( FormalParameters() "->", {!inSwitchLabel} ) LambdaExpression()
 | LOOKAHEAD(3) "(" Expression() ")"
 | AllocationExpression()
 | LOOKAHEAD( ResultType() "." "class" ) ResultType() "." "class"
@@ -1959,8 +1893,36 @@ void LambdaExpression() :
 { checkForBadLambdaUsage(); }
 {
   VariableDeclaratorId() "->" ( Expression() | Block() )
-| LOOKAHEAD(3) FormalParameters() "->" ( Expression() | Block() )
+| LOOKAHEAD(3) LambdaParameters() "->" ( Expression() | Block() )
 | LOOKAHEAD(3) "(" VariableDeclaratorId() ( "," VariableDeclaratorId() )* ")" "->" ( Expression() | Block() )
+}
+
+void LambdaParameters() #FormalParameters :
+{}
+{
+    "(" [ LambdaParameterList() ] ")"
+}
+
+void LambdaParameterList() #void :
+{}
+{
+    LambdaParameter() ( "," LambdaParameter() )*
+}
+
+void LambdaParameter() #FormalParameter :
+{}
+{
+    ( "final" {jjtThis.setFinal(true);} | Annotation() )*
+    LambdaParameterType()
+    [ "..." {checkForBadVariableArgumentsUsage();} {jjtThis.setVarargs();} ]
+    VariableDeclaratorId()
+}
+
+void LambdaParameterType() #void :
+{}
+{
+    LOOKAHEAD( { jdkVersion >= 11 && isKeyword("var") } ) <IDENTIFIER>
+    | Type()
 }
 
 void PrimarySuffix() :
@@ -1981,7 +1943,8 @@ void Literal() :
 | t=<FLOATING_POINT_LITERAL> { checkForBadNumericalLiteralslUsage(t); jjtThis.setImage(t.image); jjtThis.setFloatLiteral();}
 | t=<HEX_FLOATING_POINT_LITERAL> { checkForBadHexFloatingPointLiteral(); checkForBadNumericalLiteralslUsage(t); jjtThis.setImage(t.image); jjtThis.setFloatLiteral();}
 | t=<CHARACTER_LITERAL> {jjtThis.setImage(t.image); jjtThis.setCharLiteral();}
-| t=<STRING_LITERAL> {jjtThis.setImage(t.image); jjtThis.setStringLiteral();}
+| t=<STRING_LITERAL> {jjtThis.setImage(t.image); checkForNewStringSpaceEscape(t.image); jjtThis.setStringLiteral(); }
+| t=<TEXT_BLOCK_LITERAL> { checkForTextBlockLiteral(); checkForNewStringSpaceEscape(t.image); jjtThis.setImage(t.image); jjtThis.setStringLiteral();}
 | BooleanLiteral()
 | NullLiteral()
 }
@@ -2011,7 +1974,7 @@ void ArgumentList() :
 void AllocationExpression():
 {}
 {
-  "new" (Annotation() {checkForBadTypeAnnotations();})*
+  "new" (TypeAnnotation())*
   (LOOKAHEAD(2)
     PrimitiveType() ArrayDimsAndInits()
   |
@@ -2026,8 +1989,8 @@ void AllocationExpression():
             { inInterface = inInterfaceOld; } // always restore the flag after leaving the node
         ]
      )
+    { checkForBadAnonymousDiamondUsage(); }
   )
-  { checkForBadAnonymousDiamondUsage(); }
 }
 
 /*
@@ -2039,7 +2002,7 @@ void ArrayDimsAndInits() :
 {
 
   LOOKAHEAD(2)
-  ( LOOKAHEAD(2) (Annotation() {checkForBadTypeAnnotations();})* "[" Expression() "]" {jjtThis.bumpArrayDepth();})+ ( LOOKAHEAD(2) "[" "]" {jjtThis.bumpArrayDepth();} )*
+  ( LOOKAHEAD(2) (TypeAnnotation())* "[" Expression() "]" {jjtThis.bumpArrayDepth();})+ ( LOOKAHEAD(2) "[" "]" {jjtThis.bumpArrayDepth();} )*
 |
   ( "[" "]" {jjtThis.bumpArrayDepth();})+ ArrayInitializer()
 }
@@ -2053,6 +2016,7 @@ void Statement() :
 {}
 {
   LOOKAHEAD( { isNextTokenAnAssert() } ) AssertStatement()
+| LOOKAHEAD( { isYieldStart() } ) YieldStatement()
 | LOOKAHEAD(2) LabeledStatement()
 | Block()
 | EmptyStatement()
@@ -2080,36 +2044,89 @@ void Block() :
 {Token t;}
 {
       "{"
-       
+
       ( BlockStatement() )* t = "}" { if (isPrecededByComment(t)) { jjtThis.setContainsComment(); } }
 }
 
 void BlockStatement():
-{}
+{int mods = 0;}
 {
   LOOKAHEAD( { isNextTokenAnAssert() } ) AssertStatement()
-|
-  LOOKAHEAD(( "final" | Annotation() )* Type() <IDENTIFIER>)
-  LocalVariableDeclaration() ";"
+| LOOKAHEAD( { isYieldStart() } ) YieldStatement()
+| LOOKAHEAD( "@" | "final" )
+    // this eagerly parses all modifiers and annotations. After that, either a local type declaration
+    // or a local variable declaration follows.
+    // This allows more modifiers for local variables than actually allowed
+    // and the annotations for local variables need to be moved in the AST down again.
+    mods=Modifiers()
+    (
+        LOOKAHEAD({localTypeDeclLookahead()}) LocalTypeDecl(mods)
+        |
+        {
+            List<Node> annotationsAndChildren = new ArrayList<Node>();
+            if (jjtree.nodeArity() > 0) { // peekNode would throw if the stack is empty
+                while (jjtree.peekNode() instanceof ASTAnnotation) {
+                  annotationsAndChildren.add(jjtree.popNode());
+                }
+            }
+        }
+        LocalVariableDeclaration()
+        {
+            ASTLocalVariableDeclaration localVarDecl = (ASTLocalVariableDeclaration) jjtree.peekNode();
+            if ((mods & AccessNode.FINAL) == AccessNode.FINAL) {
+                localVarDecl.setFinal(true);
+            }
+            if (!annotationsAndChildren.isEmpty()) {
+                Collections.reverse(annotationsAndChildren);
+                for (int i = 0; i < localVarDecl.getNumChildren(); i++) {
+                    annotationsAndChildren.add(localVarDecl.getChild(i));
+                }
+                for (int i = 0; i < annotationsAndChildren.size(); i++) {
+                    Node child = annotationsAndChildren.get(i);
+                    child.jjtSetParent(localVarDecl);
+                    localVarDecl.jjtAddChild(child, i);
+                }
+            }
+        }
+        ";"
+    )
+| LOOKAHEAD({classModifierLookahead() || localTypeDeclLookahead()})
+    mods=Modifiers()
+    LocalTypeDecl(mods)
+| LOOKAHEAD(Type() <IDENTIFIER>)
+    LocalVariableDeclaration() ";"
 |
   Statement()
-|
-  /*
-  TODO: Seems like we should be discarding the "final"
-  after using it in the lookahead; I added a ["final|abstract"] inside
-  ClassOrInterfaceDeclaration, but that seems like a hack that
-  could break other things...
-  */
-  LOOKAHEAD( (Annotation())* ["final"|"abstract"] "class") (Annotation())* ClassOrInterfaceDeclaration(0)
 }
 
+void LocalTypeDecl(int mods) #void:
+{}
+{
+    (
+          LOOKAHEAD(<CLASS>) ClassOrInterfaceDeclaration(mods)
+        | LOOKAHEAD(<INTERFACE>) ClassOrInterfaceDeclaration(mods) { checkForLocalInterfaceOrEnumType(); }
+        | LOOKAHEAD({isKeyword("record")}) RecordDeclaration(mods) { checkForLocalInterfaceOrEnumType(); }
+        | LOOKAHEAD({isKeyword("enum")}) EnumDeclaration(mods) { checkForLocalInterfaceOrEnumType(); }
+    )
+}
+
+/*
+ * See https://docs.oracle.com/javase/specs/jls/se10/html/jls-14.html#jls-14.4
+ */
 void LocalVariableDeclaration() :
 {}
 {
   ( "final" {jjtThis.setFinal(true);} | Annotation() )*
-  Type()
+  LocalVariableType()
   VariableDeclarator()
   ( "," VariableDeclarator() )*
+}
+
+void LocalVariableType() #void :
+{}
+{
+  LOOKAHEAD( { jdkVersion >= 10 && isKeyword("var") } ) <IDENTIFIER>
+  | Type()
 }
 
 void EmptyStatement() :
@@ -2125,25 +2142,80 @@ void StatementExpression() :
 |
   PreDecrementExpression()
 |
-  LOOKAHEAD( PrimaryExpression() AssignmentOperator() ) PrimaryExpression() AssignmentOperator() Expression()
-|
-  PostfixExpression()
+  // using PostfixExpression here allows us to skip the part of the production tree
+  // between Expression() and PostfixExpression()
+  PostfixExpression() [ AssignmentOperator() Expression() ]
 }
 
-void SwitchStatement() :
+void SwitchStatement():
 {}
 {
-  "switch" "(" Expression() ")" "{"
-    ( SwitchLabel() ( BlockStatement() )* )*
-  "}"
+  "switch" "(" Expression() ")" SwitchBlock()
+}
+
+void SwitchBlock() #void :
+{}
+{
+    "{"
+        (
+            SwitchLabel()
+            (
+                "->" SwitchLabeledRulePart() (SwitchLabeledRule())*
+            |
+                ":" (LOOKAHEAD(2) SwitchLabel() ":")*
+                    // the lookahead is to prevent choosing BlockStatement when the token is "default",
+                    // which could happen as local class declarations accept the "default" modifier.
+                    (LOOKAHEAD({shouldStartStatementInSwitch()}) BlockStatement())*
+                    (SwitchLabeledStatementGroup())*
+            )
+        )?
+    "}"
+}
+
+void SwitchLabeledRule() #void :
+{checkForSwitchRules();}
+{
+    SwitchLabel() "->" SwitchLabeledRulePart()
+}
+
+void SwitchLabeledRulePart() #void:
+{checkForSwitchRules();}
+{
+    (
+        ( Expression() ";" ) #SwitchLabeledExpression(2)
+      |
+        ( Block() ) #SwitchLabeledBlock(2)
+      |
+        ( ThrowStatement() ) #SwitchLabeledThrowStatement(2)
+    )
+}
+
+// For PMD 7, make this a real node to group the labels + statements
+void SwitchLabeledStatementGroup() #void:
+{}
+{
+    (LOOKAHEAD(2) SwitchLabel() ":")+
+        // the lookahead is to prevent choosing BlockStatement when the token is "default",
+        // which could happen as local class declarations accept the "default" modifier.
+        (LOOKAHEAD({shouldStartStatementInSwitch()}) BlockStatement() )*
 }
 
 void SwitchLabel() :
 {}
 {
-  "case" Expression() ":"
+{ inSwitchLabel = true; }
+(
+  "case" ( ConditionalExpression() #Expression ) ({checkForMultipleCaseLabels();} "," ( ConditionalExpression() #Expression ) )*
 |
-  "default" {jjtThis.setDefault();} ":"
+  "default" {jjtThis.setDefault();}
+)
+{ inSwitchLabel = false; }
+}
+
+void YieldStatement() :
+{ checkForYieldStatement(); }
+{
+  <IDENTIFIER> Expression() ";"
 }
 
 void IfStatement() :
@@ -2155,7 +2227,6 @@ void IfStatement() :
 {}
 {
   "if" "(" Expression() ")" Statement() [ LOOKAHEAD(1) "else" {jjtThis.setHasElse();} Statement() ]
-{}
 }
 
 void WhileStatement() :
@@ -2256,7 +2327,7 @@ void ResourceSpecification() :
 	"("
 	Resources()
 	(LOOKAHEAD(2) ";")?
-	")"	
+	")"
 }
 
 void Resources() :
@@ -2268,7 +2339,7 @@ void Resources() :
 void Resource() :
 {}
 {
-   LOOKAHEAD(2) ( ( "final" {jjtThis.setFinal(true);} | Annotation() )* Type() VariableDeclaratorId() "=" Expression() )
+   LOOKAHEAD(2) ( ( "final" {jjtThis.setFinal(true);} | Annotation() )* LocalVariableType() VariableDeclaratorId() "=" Expression() )
    |
    Name() {checkForBadConciseTryWithResourcesUsage();}
 }
@@ -2301,7 +2372,7 @@ void AssertStatement() :
  * type declaration syntax with generics clean
  */
 
-void RUNSIGNEDSHIFT():
+void RUNSIGNEDSHIFT(): // TODO 7.0.0 make #void
 {}
 {
   ( LOOKAHEAD({ getToken(1).kind == GT &&
@@ -2310,7 +2381,7 @@ void RUNSIGNEDSHIFT():
   )
 }
 
-void RSIGNEDSHIFT():
+void RSIGNEDSHIFT(): // TODO 7.0.0 make #void
 {}
 {
   ( LOOKAHEAD({ getToken(1).kind == GT &&
@@ -2379,6 +2450,15 @@ void  MemberValueArrayInitializer():
   "{" (MemberValue() ( LOOKAHEAD(2) "," MemberValue() )* [ "," ])? "}"
 }
 
+/*
+ * We use that ghost production to factorise the check for JDK >= 1.8.
+ */
+void TypeAnnotation() #void:
+{}
+{
+    Annotation() {checkForBadTypeAnnotations();}
+}
+
 
 /* Annotation Types. */
 
@@ -2388,7 +2468,13 @@ Token t;
 jjtThis.setModifiers(modifiers);
 }
 {
-  "@" "interface" t=<IDENTIFIER> {checkForBadAnnotationUsage();jjtThis.setImage(t.image);} AnnotationTypeBody()
+  "@" "interface" t=<IDENTIFIER>
+    {
+        checkForBadAnnotationUsage();
+        checkForBadTypeIdentifierUsage(t.image);
+        jjtThis.setImage(t.image);
+    }
+  AnnotationTypeBody()
 }
 
 void AnnotationTypeBody():

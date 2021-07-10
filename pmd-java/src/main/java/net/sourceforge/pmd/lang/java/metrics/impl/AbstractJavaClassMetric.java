@@ -35,6 +35,7 @@ public abstract class AbstractJavaClassMetric extends AbstractJavaMetric<ASTAnyT
      *
      * @return True if the metric can be computed on this type declaration
      */
+    @Override
     public boolean supports(ASTAnyTypeDeclaration node) {
         return node.getTypeKind() != TypeKind.ANNOTATION && node.getTypeKind() != TypeKind.INTERFACE;
     }
@@ -114,9 +115,7 @@ public abstract class AbstractJavaClassMetric extends AbstractJavaMetric<ASTAnyT
         List<ASTAnyTypeBodyDeclaration> decls = node.getDeclarations();
 
         for (ASTAnyTypeBodyDeclaration decl : decls) {
-            if (decl.jjtGetNumChildren() > 0 && tClass.isInstance(decl.jjtGetChild(0))) {
-                result.add(tClass.cast(decl.jjtGetChild(0)));
-            }
+            result.addAll(decl.findChildrenOfType(tClass));
         }
 
         return result;

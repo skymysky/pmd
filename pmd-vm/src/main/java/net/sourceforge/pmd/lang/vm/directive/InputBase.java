@@ -17,7 +17,7 @@ package net.sourceforge.pmd.lang.vm.directive;
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
- * under the License.    
+ * under the License.
  */
 
 /**
@@ -26,12 +26,15 @@ package net.sourceforge.pmd.lang.vm.directive;
  *
  * @author <a href="mailto:dlr@finemaltcoding.com">Daniel Rall</a>
  * @since 1.4
+ * @deprecated for removal in PMD 7.0.0
  */
+@Deprecated
 public abstract class InputBase extends Directive {
     /**
      * Return name of this directive.
-     * 
+     *
      * @return The name of this directive.
      */
+    @Override
     public abstract String getName();
 }

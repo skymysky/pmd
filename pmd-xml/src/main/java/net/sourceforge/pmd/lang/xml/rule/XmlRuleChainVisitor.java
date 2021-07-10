@@ -12,10 +12,17 @@ import net.sourceforge.pmd.Rule;
 import net.sourceforge.pmd.RuleContext;
 import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.lang.rule.AbstractRuleChainVisitor;
+import net.sourceforge.pmd.lang.rule.RuleChainVisitor;
 import net.sourceforge.pmd.lang.rule.XPathRule;
 
+/**
+ * @deprecated for removal with PMD 7. A language dependent rule chain visitor is not needed anymore.
+ *      See {@link RuleChainVisitor}.
+ */
+@Deprecated
 public class XmlRuleChainVisitor extends AbstractRuleChainVisitor {
 
+    @Override
     protected void indexNodes(List<Node> nodes, RuleContext ctx) {
         // Visit Nodes in DFS order
         Stack<Node> stack = new Stack<>();
@@ -24,14 +31,15 @@ public class XmlRuleChainVisitor extends AbstractRuleChainVisitor {
         while (!stack.isEmpty()) {
             Node node = stack.pop();
             indexNode(node);
-            if (node.jjtGetNumChildren() > 0) {
-                for (int i = node.jjtGetNumChildren() - 1; i >= 0; i--) {
-                    stack.push(node.jjtGetChild(i));
+            if (node.getNumChildren() > 0) {
+                for (int i = node.getNumChildren() - 1; i >= 0; i--) {
+                    stack.push(node.getChild(i));
                 }
             }
         }
     }
 
+    @Override
     protected void visit(Rule rule, Node node, RuleContext ctx) {
         // Rule better be a XPathRule
         ((XPathRule) rule).evaluate(node, ctx);

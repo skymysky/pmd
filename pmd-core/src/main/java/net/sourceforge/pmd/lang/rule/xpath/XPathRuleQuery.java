@@ -8,35 +8,52 @@ import java.util.List;
 import java.util.Map;
 
 import net.sourceforge.pmd.RuleContext;
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.properties.PropertyDescriptor;
 
 /**
  * This interface captures the logic needed by XPathRule to implement an XPath
  * based query on an AST Node.
+ *
  * <p>
  * Implementations of this class do not need to be thread-safe, but they will be
  * reused to query against different AST Nodes. Therefore, internal state should
  * be maintained in a fashion consistent with reuse. Further, implementations
  * are recommended to manage internal state that is invariant over AST Nodes in
  * a fashion which facilities high performance (e.g. caching).
+ * </p>
+ *
+ * @deprecated This will be internalized in 7.0.0.
  */
+@InternalApi
+@Deprecated
 public interface XPathRuleQuery {
 
     /**
      * XPath 1.0 version.
+     *
+     * @deprecated Use {@link XPathVersion}
      */
+    @Deprecated
     String XPATH_1_0 = "1.0";
 
     /**
      * XPath 1.0 compatibility version.
+     *
+     * @deprecated Use {@link XPathVersion}
      */
+    @Deprecated
     String XPATH_1_0_COMPATIBILITY = "1.0 compatibility";
 
     /**
      * XPath 2.0 version.
+     *
+     * @deprecated Use {@link XPathVersion}
      */
+    @Deprecated
     String XPATH_2_0 = "2.0";
+
 
     /**
      * Set the XPath query string to be used.
@@ -63,7 +80,7 @@ public interface XPathRuleQuery {
 
     /**
      * Indicates which AST Nodes (if any) should be used with the RuleChain. Use
-     * of the RuleChain will allow the query execute on a targed sub-tree of the
+     * of the RuleChain will allow the query execute on a targeted sub-tree of the
      * AST, instead of the entire AST from the root. This can result in great
      * performance benefits.
      */

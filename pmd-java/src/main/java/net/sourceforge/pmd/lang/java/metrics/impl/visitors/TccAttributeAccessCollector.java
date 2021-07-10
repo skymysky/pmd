@@ -8,8 +8,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.java.ast.ASTAnyTypeDeclaration;
 import net.sourceforge.pmd.lang.java.ast.ASTClassOrInterfaceDeclaration;
 import net.sourceforge.pmd.lang.java.ast.ASTConstructorDeclaration;
@@ -29,7 +31,10 @@ import net.sourceforge.pmd.lang.symboltable.Scope;
  *
  * @author Clément Fournier
  * @since 6.0.0
+ * @deprecated Is internal API, will be moved in 7.0.0
  */
+@Deprecated
+@InternalApi
 public class TccAttributeAccessCollector extends JavaParserVisitorReducedAdapter {
 
     private final ASTAnyTypeDeclaration exploredClass;
@@ -57,7 +62,7 @@ public class TccAttributeAccessCollector extends JavaParserVisitorReducedAdapter
 
     @Override
     public Object visit(ASTAnyTypeDeclaration node, Object data) {
-        if (node == exploredClass) {
+        if (Objects.equals(node, exploredClass)) {
             methodAttributeAccess = new HashMap<>();
             super.visit(node, data);
         } else if (node instanceof ASTClassOrInterfaceDeclaration
@@ -109,9 +114,9 @@ public class TccAttributeAccessCollector extends JavaParserVisitorReducedAdapter
             }
         }
 
-
         return super.visit(node, data);
     }
+
 
     private String getVariableName(ASTPrimaryExpression node) {
         ASTPrimaryPrefix prefix = node.getFirstDescendantOfType(ASTPrimaryPrefix.class);

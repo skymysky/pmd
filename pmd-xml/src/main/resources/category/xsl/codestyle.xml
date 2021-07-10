@@ -3,7 +3,7 @@
 <ruleset name="Code Style"
          xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
     <description>
 Rules which enforce a specific coding style.
@@ -21,6 +21,7 @@ The XPath concat() functions accepts as many arguments as required so you can ha
         </description>
         <priority>3</priority>
         <properties>
+            <property name="version" value="2.0"/>
             <property name="xpath">
 <!-- the use of node() allow to target any node with an select attribute
      but also workaround the ambiguity of having the xsl namespace in the

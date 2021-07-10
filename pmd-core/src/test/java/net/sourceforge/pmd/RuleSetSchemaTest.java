@@ -15,7 +15,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -83,7 +82,7 @@ public class RuleSetSchemaTest {
                 + "<ruleset " + PMD.EOL
                 + "    xmlns=\"http://pmd.sourceforge.net/ruleset/" + version + "\"" + PMD.EOL
                 + "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" + PMD.EOL
-                + "    xsi:schemaLocation=\"http://pmd.sourceforge.net/ruleset/" + version + " http://pmd.sourceforge.net/ruleset_" + versionUnderscore + ".xsd\""
+                + "    xsi:schemaLocation=\"http://pmd.sourceforge.net/ruleset/" + version + " https://pmd.sourceforge.io/ruleset_" + versionUnderscore + ".xsd\""
                 + "    name=\"Custom ruleset\" >" + PMD.EOL
                 + "  <description>" + PMD.EOL
                 + "  This ruleset checks my code for bad stuff" + PMD.EOL
@@ -112,7 +111,7 @@ public class RuleSetSchemaTest {
 
         @Override
         public InputSource resolveEntity(String publicId, String systemId) throws SAXException, IOException {
-            if ("http://pmd.sourceforge.net/ruleset_2_0_0.xsd".equals(systemId)) {
+            if ("https://pmd.sourceforge.io/ruleset_2_0_0.xsd".equals(systemId)) {
                 return new InputSource(schema2.toExternalForm());
             }
             throw new IllegalArgumentException("Unable to resolve entity (publicId=" + publicId + ", systemId=" + systemId + ")");

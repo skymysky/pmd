@@ -17,7 +17,7 @@ import net.sourceforge.pmd.util.NumericConstants;
  * <p>If a class has a high number of public operations, it might be wise
  * to consider whether it would be appropriate to divide it into
  * subclasses.</p>
- * 
+ *
  * <p>A large proportion of public members and operations means the class
  * has high potential to be affected by external classes. Futhermore,
  * increased effort will be required to thoroughly test the class.
@@ -35,14 +35,16 @@ public class ExcessivePublicCountRule extends ExcessiveNodeCountRule {
     /**
      * Method counts ONLY public methods.
      */
+    @Override
     public Object visit(ASTMethodDeclarator node, Object data) {
-        return this.getTallyOnAccessType((AccessNode) node.jjtGetParent());
+        return this.getTallyOnAccessType((AccessNode) node.getParent());
     }
 
     /**
      * Method counts ONLY public class attributes which are not PUBLIC and
      * static- these usually represent constants....
      */
+    @Override
     public Object visit(ASTFieldDeclaration node, Object data) {
         if (node.isFinal() && node.isStatic()) {
             return NumericConstants.ZERO;

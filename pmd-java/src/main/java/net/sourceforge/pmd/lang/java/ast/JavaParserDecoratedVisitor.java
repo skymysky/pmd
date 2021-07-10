@@ -4,6 +4,8 @@
 
 package net.sourceforge.pmd.lang.java.ast;
 
+import net.sourceforge.pmd.annotation.Experimental;
+
 /**
  * External wrapper for a visitor decorator. This one drives the AST visit, delegating to the base controlless visitor
  * given in the constructor. Add decorators using the {@link #decorateWith(JavaParserVisitorDecorator)}.
@@ -14,7 +16,10 @@ package net.sourceforge.pmd.lang.java.ast;
  *
  * @author Clément Fournier
  * @since 6.0.0
+ *
+ * @deprecated Visitor decorators are deprecated because they lead to fragile code.
  */
+@Deprecated
 public class JavaParserDecoratedVisitor implements JavaParserVisitor {
 
 
@@ -252,14 +257,22 @@ public class JavaParserDecoratedVisitor implements JavaParserVisitor {
     }
 
 
+    /**
+     * @deprecated Will be removed in 7.0.0. Use {@link ASTShiftExpression#getOperator()}
+     */
     @Override
+    @Deprecated
     public Object visit(ASTRUNSIGNEDSHIFT node, Object data) {
         visitor.visit(node, data);
         return visit((JavaNode) node, data);
     }
 
 
+    /**
+     * @deprecated Will be removed in 7.0.0. Use {@link ASTShiftExpression#getOperator()}
+     */
     @Override
+    @Deprecated
     public Object visit(ASTRSIGNEDSHIFT node, Object data) {
         visitor.visit(node, data);
         return visit((JavaNode) node, data);
@@ -854,6 +867,79 @@ public class JavaParserDecoratedVisitor implements JavaParserVisitor {
 
     @Override
     public Object visit(ASTModuleName node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTSwitchExpression node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTSwitchLabeledBlock node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTSwitchLabeledExpression node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTSwitchLabeledThrowStatement node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTYieldStatement node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTTypePattern node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTRecordDeclaration node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTRecordComponentList node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTRecordComponent node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTRecordBody node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    public Object visit(ASTCompactConstructorDeclaration node, Object data) {
+        visitor.visit(node, data);
+        return visit((JavaNode) node, data);
+    }
+
+    @Override
+    @Experimental
+    public Object visit(ASTPermitsList node, Object data) {
         visitor.visit(node, data);
         return visit((JavaNode) node, data);
     }

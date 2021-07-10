@@ -10,7 +10,6 @@ import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.util.List;
-
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
 import javax.swing.JComponent;
@@ -67,7 +66,7 @@ public class DFAPanel extends JComponent implements ListSelectionListener {
                 return "";
             }
 
-            StringBuffer sb = new StringBuffer();
+            StringBuilder sb = new StringBuilder();
             sb.append(kids.get(0).getIndex());
 
             for (int j = 1; j < node.getChildren().size(); j++) {

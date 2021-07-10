@@ -45,8 +45,12 @@ import net.sourceforge.pmd.util.filter.Filters;
  * options.</p>
  *
  * @author Ryan Gustafson &lt;ryan.gustafson@gmail.com&gt;
+ *
+ * @deprecated DCD was never fully implemented, it has not been touched since the initial commit in 2008.
+ *             All its codebase will be removed for PMD 7.0.0. Do not use it.
  */
-public class DCD {
+@Deprecated
+public final class DCD {
     //
     // TODO Implement the direct users, indirect users, and dead code
     // candidate sets. Use the pmd.util.filter.Filter APIs. Need to come up

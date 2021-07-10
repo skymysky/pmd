@@ -8,12 +8,16 @@ import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import net.sourceforge.pmd.annotation.InternalApi;
+
 /**
  * @author Romain PELISSE, belaran@gmail.com
  * @author Roberto Ferranti - rferranti@users.sourceforge.net Thanks to Jesse
  *         Glick for the bug report.
- *
+ * @deprecated Is internal API
  */
+@Deprecated
+@InternalApi
 public class ScopedLogHandlersManager {
 
     private static final String PACKAGE_NAME = "net.sourceforge.pmd";
@@ -36,7 +40,9 @@ public class ScopedLogHandlersManager {
         }
         for (Handler handler : newHandlers) {
             logger.addHandler(handler);
+            handler.setLevel(level);
         }
+        logger.setUseParentHandlers(false);
     }
 
     public void close() {
@@ -47,5 +53,6 @@ public class ScopedLogHandlersManager {
             logger.addHandler(handler);
         }
         logger.setLevel(oldLogLevel);
+        logger.setUseParentHandlers(true);
     }
 }

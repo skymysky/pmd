@@ -9,8 +9,9 @@ import net.sourceforge.pmd.lang.java.rule.AbstractJavaRule;
 
 public class DontImportSunRule extends AbstractJavaRule {
 
+    @Override
     public Object visit(ASTImportDeclaration node, Object data) {
-        String img = node.jjtGetChild(0).getImage();
+        String img = node.getChild(0).getImage();
         if (img.startsWith("sun.") && !img.startsWith("sun.misc.Signal")) {
             addViolation(data, node);
         }

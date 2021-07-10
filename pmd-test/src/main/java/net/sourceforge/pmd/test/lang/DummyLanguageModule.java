@@ -25,6 +25,7 @@ import net.sourceforge.pmd.lang.ast.ParseException;
 import net.sourceforge.pmd.lang.rule.AbstractRuleChainVisitor;
 import net.sourceforge.pmd.lang.rule.AbstractRuleViolationFactory;
 import net.sourceforge.pmd.lang.rule.ParametricRuleViolation;
+import net.sourceforge.pmd.lang.rule.RuleChainVisitor;
 import net.sourceforge.pmd.test.lang.ast.DummyNode;
 
 /**
@@ -36,7 +37,7 @@ public class DummyLanguageModule extends BaseLanguageModule {
     public static final String TERSE_NAME = "dummy";
 
     public DummyLanguageModule() {
-        super(NAME, null, TERSE_NAME, DummyRuleChainVisitor.class, "dummy");
+        super(NAME, null, TERSE_NAME, "dummy");
         addVersion("1.0", new Handler(), false);
         addVersion("1.1", new Handler(), false);
         addVersion("1.2", new Handler(), false);
@@ -48,6 +49,11 @@ public class DummyLanguageModule extends BaseLanguageModule {
         addVersion("1.8", new Handler(), false);
     }
 
+    /**
+     * @deprecated for removal with PMD 7. A language dependent rule chain visitor is not needed anymore.
+     *      See {@link RuleChainVisitor}.
+     */
+    @Deprecated
     public static class DummyRuleChainVisitor extends AbstractRuleChainVisitor {
         @Override
         protected void visit(Rule rule, Node node, RuleContext ctx) {
@@ -59,8 +65,8 @@ public class DummyLanguageModule extends BaseLanguageModule {
             for (Node n : nodes) {
                 indexNode(n);
                 List<Node> childs = new ArrayList<>();
-                for (int i = 0; i < n.jjtGetNumChildren(); i++) {
-                    childs.add(n.jjtGetChild(i));
+                for (int i = 0; i < n.getNumChildren(); i++) {
+                    childs.add(n.getChild(i));
                 }
                 indexNodes(childs, ctx);
             }
@@ -113,9 +119,10 @@ public class DummyLanguageModule extends BaseLanguageModule {
         protected RuleViolation createRuleViolation(Rule rule, RuleContext ruleContext, Node node, String message,
                 int beginLine, int endLine) {
             ParametricRuleViolation<Node> rv = new ParametricRuleViolation<Node>(rule, ruleContext, node, message) {
-                {
-                    // just for testing variable expansion
-                    this.packageName = "foo"; 
+                @Override
+                public String getPackageName() {
+                    this.packageName = "foo"; // just for testing variable expansion
+                    return super.getPackageName();
                 }
             };
             rv.setLines(beginLine, endLine);

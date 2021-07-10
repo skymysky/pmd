@@ -12,23 +12,29 @@ import org.w3c.dom.Element;
 
 import net.sourceforge.pmd.Rule;
 import net.sourceforge.pmd.RulePriority;
+import net.sourceforge.pmd.RuleSetReference;
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.Language;
 import net.sourceforge.pmd.lang.LanguageRegistry;
 import net.sourceforge.pmd.lang.LanguageVersion;
 import net.sourceforge.pmd.properties.PropertyDescriptor;
+import net.sourceforge.pmd.util.ResourceLoader;
 
 
 /**
  * Builds a rule, validating its parameters throughout. The builder can define property descriptors, but not override
- * them. For that, use {@link RuleFactory#decorateRule(Rule, Element)}.
+ * them. For that, use {@link RuleFactory#decorateRule(Rule, RuleSetReference, Element)}.
  *
  * @author Clément Fournier
  * @since 6.0.0
  */
-/* default */ class RuleBuilder {
+@InternalApi
+@Deprecated
+public class RuleBuilder {
 
     private List<PropertyDescriptor<?>> definedProperties = new ArrayList<>();
     private String name;
+    private ResourceLoader resourceLoader;
     private String clazz;
     private Language language;
     private String minimumVersion;
@@ -44,8 +50,19 @@ import net.sourceforge.pmd.properties.PropertyDescriptor;
     private boolean isUsesMultifile;
     private boolean isUsesTyperesolution;
 
-    /* default */ RuleBuilder(String name, String clazz, String language) {
+    /**
+     * @deprecated Use {@link #RuleBuilder(String, ResourceLoader, String, String)} with the
+     * proper {@link ResourceLoader} instead. The resource loader is used to load the
+     * rule implementation class from the class path.
+     */
+    @Deprecated
+    public RuleBuilder(String name, String clazz, String language) {
+        this(name, new ResourceLoader(), clazz, language);
+    }
+
+    public RuleBuilder(String name, ResourceLoader resourceLoader, String clazz, String language) {
         this.name = name;
+        this.resourceLoader = resourceLoader;
         language(language);
         className(clazz);
     }
@@ -149,7 +166,7 @@ import net.sourceforge.pmd.properties.PropertyDescriptor;
         if (minimumVersion != null) {
             LanguageVersion minimumLanguageVersion = rule.getLanguage().getVersion(minimumVersion);
             if (minimumLanguageVersion == null) {
-                throwUnknownLanguageVersionException("minimum", minimumVersion);
+                throwUnknownLanguageVersionException("minimum", minimumVersion, rule.getLanguage());
             } else {
                 rule.setMinimumLanguageVersion(minimumLanguageVersion);
             }
@@ -158,7 +175,7 @@ import net.sourceforge.pmd.properties.PropertyDescriptor;
         if (maximumVersion != null) {
             LanguageVersion maximumLanguageVersion = rule.getLanguage().getVersion(maximumVersion);
             if (maximumLanguageVersion == null) {
-                throwUnknownLanguageVersionException("maximum", maximumVersion);
+                throwUnknownLanguageVersionException("maximum", maximumVersion, rule.getLanguage());
             } else {
                 rule.setMaximumLanguageVersion(maximumLanguageVersion);
             }
@@ -167,16 +184,16 @@ import net.sourceforge.pmd.properties.PropertyDescriptor;
         checkLanguageVersionsAreOrdered(rule);
     }
 
-    private void throwUnknownLanguageVersionException(String minOrMax, String unknownVersion) {
+    private void throwUnknownLanguageVersionException(String minOrMax, String unknownVersion, Language lang) {
         throw new IllegalArgumentException("Unknown " + minOrMax + " Language Version '" + unknownVersion
-                                           + "' for Language '" + language.getTerseName()
+                                           + "' for Language '" + lang.getTerseName()
                                            + "' for Rule " + name
                                            + "; supported Language Versions are: "
-                                           + LanguageRegistry.commaSeparatedTerseNamesForLanguageVersion(language.getVersions()));
+                                           + LanguageRegistry.commaSeparatedTerseNamesForLanguageVersion(lang.getVersions()));
     }
 
     public Rule build() throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-        Rule rule = (Rule) RuleBuilder.class.getClassLoader().loadClass(clazz).newInstance();
+        Rule rule = resourceLoader.loadRuleFromClassPath(clazz);
 
         rule.setName(name);
         rule.setRuleClass(clazz);

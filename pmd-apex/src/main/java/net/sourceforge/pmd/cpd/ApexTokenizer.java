@@ -40,6 +40,7 @@ public class ApexTokenizer implements Tokenizer {
 
         ANTLRStringStream ass = new ANTLRStringStream(code.toString());
         ApexLexer lexer = new ApexLexer(ass) {
+            @Override
             public void emitErrorMessage(String msg) {
                 throw new TokenMgrError(msg, TokenMgrError.LEXICAL_ERROR);
             }
@@ -54,7 +55,9 @@ public class ApexTokenizer implements Tokenizer {
                     if (!caseSensitive) {
                         tokenText = tokenText.toLowerCase(Locale.ROOT);
                     }
-                    TokenEntry tokenEntry = new TokenEntry(tokenText, sourceCode.getFileName(), token.getLine());
+                    TokenEntry tokenEntry = new TokenEntry(tokenText, sourceCode.getFileName(), token.getLine(),
+                                                           token.getCharPositionInLine() + 1,
+                                                           token.getCharPositionInLine() + tokenText.length());
                     tokenEntries.add(tokenEntry);
                 }
                 token = lexer.nextToken();

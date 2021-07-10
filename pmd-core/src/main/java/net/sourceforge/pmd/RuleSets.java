@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.Language;
 import net.sourceforge.pmd.lang.ast.Node;
 
@@ -19,7 +20,11 @@ import net.sourceforge.pmd.lang.ast.Node;
  * Grouping of Rules per Language in a RuleSet.
  *
  * @author pieter_van_raemdonck - Application Engineers NV/SA - www.ae.be
+ *
+ * @deprecated Internal API
  */
+@Deprecated
+@InternalApi
 public class RuleSets {
     /**
      * Map of RuleLanguage on RuleSet.
@@ -35,8 +40,9 @@ public class RuleSets {
      * Public constructor.
      */
     public RuleSets() {
+        // default constructor
     }
-    
+
     /**
      * Copy constructor. Deep copies RuleSets.
      * @param ruleSets The RuleSets to copy.
@@ -50,12 +56,19 @@ public class RuleSets {
     /**
      * Public constructor. Add the given rule set.
      *
-     * @param ruleSet
-     *            the RuleSet
+     * @param ruleSet the RuleSet
      */
     public RuleSets(RuleSet ruleSet) {
-        this();
         addRuleSet(ruleSet);
+    }
+
+    /**
+     * Aggregate the given rulesets.
+     */
+    public RuleSets(List<RuleSet> ruleSet) {
+        for (RuleSet set : ruleSet) {
+            addRuleSet(set);
+        }
     }
 
     /**
@@ -63,9 +76,11 @@ public class RuleSets {
      * specific language. If ruleSet.getLanguage() is null, it is assumed to be
      * a RuleSet of java rules.
      *
-     * @param ruleSet
-     *            the RuleSet
+     * @param ruleSet the RuleSet
+     *
+     * @deprecated Use {@link #RuleSets(List)} and don't mutate RuleSets after creation
      */
+    @Deprecated
     public void addRuleSet(RuleSet ruleSet) {
         ruleSets.add(ruleSet);
         ruleChain.add(ruleSet);
@@ -77,7 +92,12 @@ public class RuleSets {
      * @return RuleSet[]
      */
     public RuleSet[] getAllRuleSets() {
-        return ruleSets.toArray(new RuleSet[ruleSets.size()]);
+        return ruleSets.toArray(new RuleSet[0]);
+    }
+
+    // internal
+    List<RuleSet> getRuleSetsInternal() {
+        return ruleSets;
     }
 
     public Iterator<RuleSet> getRuleSetsIterator() {
@@ -160,7 +180,9 @@ public class RuleSets {
      * @param language
      *            the language of a source
      * @return true if any rule in the RuleSet needs the DFA layer
+     * @deprecated See {@link Rule#isDfa()}
      */
+    @Deprecated
     public boolean usesDFA(Language language) {
         for (RuleSet ruleSet : ruleSets) {
             if (ruleSet.usesDFA(language)) {
@@ -209,7 +231,9 @@ public class RuleSets {
      *            The Language.
      * @return <code>true</code> if a Rule for the Language uses Type
      *         Resolution, <code>false</code> otherwise.
+     * @deprecated See {@link Rule#isTypeResolution()}
      */
+    @Deprecated
     public boolean usesTypeResolution(Language language) {
         for (RuleSet ruleSet : ruleSets) {
             if (ruleSet.usesTypeResolution(language)) {
@@ -227,7 +251,9 @@ public class RuleSets {
      *
      * @return {@code true} if a Rule for the Language uses multi file analysis,
      *         {@code false} otherwise.
+     * @deprecated See {@link Rule#isMultifile()}
      */
+    @Deprecated
     public boolean usesMultifile(Language language) {
         for (RuleSet ruleSet : ruleSets) {
             if (ruleSet.usesMultifile(language)) {
@@ -252,7 +278,7 @@ public class RuleSets {
     /**
      * Retrieves a checksum of the rulesets being used. Any change to any rule
      * of any ruleset should trigger a checksum change.
-     * 
+     *
      * @return The checksum for this ruleset collection.
      */
     public long getChecksum() {

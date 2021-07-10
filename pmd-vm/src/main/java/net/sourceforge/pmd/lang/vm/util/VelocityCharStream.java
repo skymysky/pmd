@@ -19,7 +19,7 @@ import net.sourceforge.pmd.lang.ast.CharStream;
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
- * under the License.    
+ * under the License.
  */
 
 /**
@@ -36,8 +36,10 @@ import net.sourceforge.pmd.lang.ast.CharStream;
 /**
  * An implementation of interface CharStream, where the stream is assumed to
  * contain only ASCII characters (without unicode processing).
+ *
+ * @deprecated Will be removed, replaced with SimpleCharStream
  */
-
+@Deprecated
 public final class VelocityCharStream implements CharStream {
     public static final boolean STATIC_FLAG = false;
     int bufsize;
@@ -113,37 +115,33 @@ public final class VelocityCharStream implements CharStream {
         int[] newbufline = new int[bufsize + nextBufExpand];
         int[] newbufcolumn = new int[bufsize + nextBufExpand];
 
-        try {
-            if (wrapAround) {
-                System.arraycopy(buffer, tokenBegin, newbuffer, 0, bufsize - tokenBegin);
-                System.arraycopy(buffer, 0, newbuffer, bufsize - tokenBegin, bufpos);
-                buffer = newbuffer;
+        if (wrapAround) {
+            System.arraycopy(buffer, tokenBegin, newbuffer, 0, bufsize - tokenBegin);
+            System.arraycopy(buffer, 0, newbuffer, bufsize - tokenBegin, bufpos);
+            buffer = newbuffer;
 
-                System.arraycopy(bufline, tokenBegin, newbufline, 0, bufsize - tokenBegin);
-                System.arraycopy(bufline, 0, newbufline, bufsize - tokenBegin, bufpos);
-                bufline = newbufline;
+            System.arraycopy(bufline, tokenBegin, newbufline, 0, bufsize - tokenBegin);
+            System.arraycopy(bufline, 0, newbufline, bufsize - tokenBegin, bufpos);
+            bufline = newbufline;
 
-                System.arraycopy(bufcolumn, tokenBegin, newbufcolumn, 0, bufsize - tokenBegin);
-                System.arraycopy(bufcolumn, 0, newbufcolumn, bufsize - tokenBegin, bufpos);
-                bufcolumn = newbufcolumn;
+            System.arraycopy(bufcolumn, tokenBegin, newbufcolumn, 0, bufsize - tokenBegin);
+            System.arraycopy(bufcolumn, 0, newbufcolumn, bufsize - tokenBegin, bufpos);
+            bufcolumn = newbufcolumn;
 
-                bufpos += bufsize - tokenBegin;
-                maxNextCharInd = bufpos;
-            } else {
-                System.arraycopy(buffer, tokenBegin, newbuffer, 0, bufsize - tokenBegin);
-                buffer = newbuffer;
+            bufpos += bufsize - tokenBegin;
+            maxNextCharInd = bufpos;
+        } else {
+            System.arraycopy(buffer, tokenBegin, newbuffer, 0, bufsize - tokenBegin);
+            buffer = newbuffer;
 
-                System.arraycopy(bufline, tokenBegin, newbufline, 0, bufsize - tokenBegin);
-                bufline = newbufline;
+            System.arraycopy(bufline, tokenBegin, newbufline, 0, bufsize - tokenBegin);
+            bufline = newbufline;
 
-                System.arraycopy(bufcolumn, tokenBegin, newbufcolumn, 0, bufsize - tokenBegin);
-                bufcolumn = newbufcolumn;
+            System.arraycopy(bufcolumn, tokenBegin, newbufcolumn, 0, bufsize - tokenBegin);
+            bufcolumn = newbufcolumn;
 
-                bufpos -= tokenBegin;
-                maxNextCharInd = bufpos;
-            }
-        } catch (Throwable t) {
-            throw new Error(t.getMessage());
+            bufpos -= tokenBegin;
+            maxNextCharInd = bufpos;
         }
 
         bufsize += nextBufExpand;
@@ -405,7 +403,7 @@ public final class VelocityCharStream implements CharStream {
 
     /**
      * Method to adjust line and column numbers for the start of a token.<BR>
-     * 
+     *
      * @param newLine
      * @param newCol
      */

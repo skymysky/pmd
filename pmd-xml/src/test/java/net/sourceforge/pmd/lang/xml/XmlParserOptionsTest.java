@@ -4,7 +4,7 @@
 
 package net.sourceforge.pmd.lang.xml;
 
-import static net.sourceforge.pmd.lang.ParserOptionsTest.verifyOptionsEqualsHashcode;
+import static net.sourceforge.pmd.lang.ParserOptionsTestUtils.verifyOptionsEqualsHashcode;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -19,7 +19,7 @@ import net.sourceforge.pmd.properties.BooleanProperty;
 public class XmlParserOptionsTest {
 
     @Test
-    public void testDefaults() throws Exception {
+    public void testDefaults() {
         XmlParserOptions options = new XmlParserOptions();
         assertFalse(options.isCoalescing());
         assertTrue(options.isExpandEntityReferences());
@@ -41,7 +41,7 @@ public class XmlParserOptionsTest {
     }
 
     @Test
-    public void testConstructor() throws Exception {
+    public void testConstructor() {
         MyRule rule = new MyRule();
 
         rule.setProperty(XmlParserOptions.COALESCING_DESCRIPTOR, true);

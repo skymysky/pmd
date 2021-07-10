@@ -12,6 +12,11 @@ import net.sourceforge.pmd.lang.rule.stat.StatisticalRule;
 import net.sourceforge.pmd.lang.rule.stat.StatisticalRuleHelper;
 import net.sourceforge.pmd.stat.DataPoint;
 
+
+/**
+ * @deprecated see {@link StatisticalRule}
+ */
+@Deprecated
 public abstract class AbstractStatisticalVmRule extends AbstractVmRule implements StatisticalRule {
 
     private final StatisticalRuleHelper helper = new StatisticalRuleHelper(this);
@@ -23,7 +28,7 @@ public abstract class AbstractStatisticalVmRule extends AbstractVmRule implement
 
     @Override
     public Object[] getViolationParameters(final DataPoint point) {
-        return null;
+        return new Object[0];
     }
 
     @Override

@@ -7,6 +7,8 @@ package net.sourceforge.pmd.cli;
 import java.util.Properties;
 
 import net.sourceforge.pmd.PMD;
+import net.sourceforge.pmd.PMDVersion;
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.LanguageRegistry;
 import net.sourceforge.pmd.properties.PropertyDescriptor;
 import net.sourceforge.pmd.renderers.Renderer;
@@ -17,20 +19,30 @@ import com.beust.jcommander.ParameterException;
 
 /**
  * @author Romain Pelisse &lt;belaran@gmail.com&gt;
- *
+ * @deprecated Internal API. Use {@link PMD#runPmd(String...)} or {@link PMD#main(String[])},
+ *     or {@link PmdParametersParseResult} if you just want to produce a configuration.
  */
-public class PMDCommandLineInterface {
+@Deprecated
+@InternalApi
+public final class PMDCommandLineInterface {
 
     public static final String PROG_NAME = "pmd";
 
     public static final String NO_EXIT_AFTER_RUN = "net.sourceforge.pmd.cli.noExit";
     public static final String STATUS_CODE_PROPERTY = "net.sourceforge.pmd.cli.status";
 
+    public static final int NO_ERRORS_STATUS = 0;
     public static final int ERROR_STATUS = 1;
     public static final int VIOLATIONS_FOUND = 4;
 
     private PMDCommandLineInterface() { }
 
+    /**
+     * Note: this may terminate the VM.
+     *
+     * @deprecated Use {@link PmdParametersParseResult#extractParameters(String...)}
+     */
+    @Deprecated
     public static PMDParameters extractParameters(PMDParameters arguments, String[] args, String progName) {
         JCommander jcommander = new JCommander(arguments);
         jcommander.setProgramName(progName);
@@ -39,12 +51,12 @@ public class PMDCommandLineInterface {
             jcommander.parse(args);
             if (arguments.isHelp()) {
                 jcommander.usage();
-                System.out.println(buildUsageText(jcommander));
-                setStatusCodeOrExit(ERROR_STATUS);
+                System.out.println(buildUsageText());
+                setStatusCodeOrExit(NO_ERRORS_STATUS);
             }
         } catch (ParameterException e) {
             jcommander.usage();
-            System.out.println(buildUsageText(jcommander));
+            System.out.println(buildUsageText());
             System.err.println(e.getMessage());
             setStatusCodeOrExit(ERROR_STATUS);
         }
@@ -52,19 +64,6 @@ public class PMDCommandLineInterface {
     }
 
     public static String buildUsageText() {
-        return buildUsageText(null);
-    }
-
-    public static String buildUsageText(JCommander jcommander) {
-        StringBuilder usage = new StringBuilder();
-
-        String allCommandsDescription = null;
-        if (jcommander != null && jcommander.getCommands() != null) {
-            for (String command : jcommander.getCommands().keySet()) {
-                allCommandsDescription += jcommander.getCommandDescription(command) + PMD.EOL;
-            }
-        }
-
         // TODO: Externalize that to a file available within the classpath ? -
         // with a poor's man templating ?
         String fullText = PMD.EOL + "Mandatory arguments:" + PMD.EOL + "1) A java source code filename or directory"
@@ -75,16 +74,15 @@ public class PMDCommandLineInterface {
 
         fullText += supportedVersions() + PMD.EOL;
 
-        if (allCommandsDescription != null) {
-            fullText += "Optional arguments that may be put before or after the mandatory arguments: " + PMD.EOL
-                    + allCommandsDescription + PMD.EOL;
-        }
-
         fullText += "Available report formats and their configuration properties are:" + PMD.EOL + getReports()
                 + PMD.EOL + getExamples() + PMD.EOL + PMD.EOL + PMD.EOL;
 
-        fullText += usage.toString();
         return fullText;
+    }
+
+    @Deprecated
+    public static String buildUsageText(JCommander jcommander) {
+        return buildUsageText();
     }
 
     private static String getExamples() {
@@ -93,7 +91,7 @@ public class PMDCommandLineInterface {
 
     private static String getWindowsLaunchCmd() {
         final String WINDOWS_PROMPT = "C:\\>";
-        final String launchCmd = "pmd-bin-" + PMD.VERSION + "\\bin\\pmd.bat";
+        final String launchCmd = "pmd-bin-" + PMDVersion.VERSION + "\\bin\\pmd.bat";
         return WINDOWS_PROMPT + launchCmd;
     }
 
@@ -101,25 +99,19 @@ public class PMDCommandLineInterface {
         final String launchCmd = getWindowsLaunchCmd();
         final String WINDOWS_PATH_TO_CODE = "c:\\my\\source\\code ";
 
-        return "For example on windows: " + PMD.EOL + launchCmd + " -dir " + WINDOWS_PATH_TO_CODE
-                + "-format text -R java-unusedcode,java-imports -version 1.5 -language java -debug" + PMD.EOL
-                + launchCmd + " -dir " + WINDOWS_PATH_TO_CODE
-                + "-f xml -rulesets java-basic,java-design -encoding UTF-8" + PMD.EOL + launchCmd + " -d "
-                + WINDOWS_PATH_TO_CODE + "-rulesets java-typeresolution -auxclasspath commons-collections.jar;derby.jar"
-                + PMD.EOL + launchCmd + " -d " + WINDOWS_PATH_TO_CODE
-                + "-f html -R java-typeresolution -auxclasspath file:///C:/my/classpathfile" + PMD.EOL + PMD.EOL;
+        return "For example on windows: " + PMD.EOL
+                + launchCmd + " -dir " + WINDOWS_PATH_TO_CODE + "-format text -R rulesets/java/quickstart.xml -version 1.5 -language java -debug" + PMD.EOL
+                + launchCmd + " -dir " + WINDOWS_PATH_TO_CODE + "-f xml -rulesets rulesets/java/quickstart.xml,category/java/codestyle.xml -encoding UTF-8" + PMD.EOL
+                + launchCmd + " -d " + WINDOWS_PATH_TO_CODE + "-rulesets rulesets/java/quickstart.xml -auxclasspath lib\\commons-collections.jar;lib\\derby.jar" + PMD.EOL
+                + launchCmd + " -d " + WINDOWS_PATH_TO_CODE + "-f html -R rulesets/java/quickstart.xml -auxclasspath file:///C:/my/classpathfile" + PMD.EOL + PMD.EOL;
     }
 
     private static String getUnixExample() {
-        final String UNIX_PROMPT = "$ ";
-        final String launchCmd = "pmd-bin-" + PMD.VERSION + "/bin/run.sh pmd";
-        return "For example on *nix: " + PMD.EOL + UNIX_PROMPT + launchCmd
-                + " -dir /home/workspace/src/main/java/code -f html -rulesets java-basic,java-design" + PMD.EOL
-                + UNIX_PROMPT + launchCmd
-                + " -d ./src/main/java/code -f xslt -R java-basic,java-design -property xsltFilename=my-own.xsl"
-                + PMD.EOL + UNIX_PROMPT + launchCmd
-                + " -d ./src/main/java/code -f html -R java-typeresolution -auxclasspath commons-collections.jar:derby.jar"
-                + PMD.EOL;
+        final String launchCmd = "$ pmd-bin-" + PMDVersion.VERSION + "/bin/run.sh pmd";
+        return "For example on *nix: " + PMD.EOL
+                + launchCmd + " -dir /home/workspace/src/main/java/code -f html -rulesets rulesets/java/quickstart.xml,category/java/codestyle.xml" + PMD.EOL
+                + launchCmd + " -d ./src/main/java/code -R rulesets/java/quickstart.xml -f xslt -property xsltFilename=my-own.xsl" + PMD.EOL
+                + launchCmd + " -d ./src/main/java/code -f html -R rulesets/java/quickstart.xml -auxclasspath commons-collections.jar:derby.jar" + PMD.EOL;
     }
 
     private static String supportedVersions() {
@@ -138,7 +130,7 @@ public class PMDCommandLineInterface {
     }
 
     public static String jarName() {
-        return "pmd-" + PMD.VERSION + ".jar";
+        return "pmd-" + PMDVersion.VERSION + ".jar";
     }
 
     private static String getReports() {
@@ -147,7 +139,7 @@ public class PMDCommandLineInterface {
             Renderer renderer = RendererFactory.createRenderer(reportName, new Properties());
             buf.append("   ").append(reportName).append(": ");
             if (!reportName.equals(renderer.getName())) {
-                buf.append(" Deprecated alias for '" + renderer.getName()).append(PMD.EOL);
+                buf.append(" Deprecated alias for '").append(renderer.getName()).append(PMD.EOL);
                 continue;
             }
             buf.append(renderer.getDescription()).append(PMD.EOL);
@@ -166,6 +158,10 @@ public class PMDCommandLineInterface {
         return buf.toString();
     }
 
+    /**
+     * @deprecated Use {@link PMD#main(String[])}
+     */
+    @Deprecated
     public static void run(String[] args) {
         setStatusCodeOrExit(PMD.run(args));
     }
@@ -183,11 +179,14 @@ public class PMDCommandLineInterface {
         if (noExit == null) {
             noExit = System.getProperty(NO_EXIT_AFTER_RUN);
         }
-        return (noExit == null ? true : false);
+        return noExit == null;
     }
 
     private static void setStatusCode(int statusCode) {
         System.setProperty(STATUS_CODE_PROPERTY, Integer.toString(statusCode));
     }
 
+    public static void printJcommanderUsageOnConsole() {
+        new JCommander(new PMDParameters()).usage();
+    }
 }

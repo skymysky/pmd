@@ -12,7 +12,9 @@ import net.sourceforge.pmd.properties.MultiValuePropertyDescriptor;
  *
  * @param <V> Element type of the list
  * @param <T> Concrete type of the underlying builder
+ * @deprecated see {@link net.sourceforge.pmd.properties.builders.PropertyDescriptorBuilder}
  */
+@Deprecated
 public abstract class MultiNumericPropertyBuilder<V, T extends MultiNumericPropertyBuilder<V, T>>
     extends MultiValuePropertyBuilder<V, T> {
 
@@ -30,8 +32,8 @@ public abstract class MultiNumericPropertyBuilder<V, T extends MultiNumericPrope
     /**
      * Specify the range of acceptable values.
      *
-     * @param min Lower bound
-     * @param max Upper bound
+     * @param min Lower bound, inclusive
+     * @param max Upper bound, inclusive
      *
      * @return The same builder
      */

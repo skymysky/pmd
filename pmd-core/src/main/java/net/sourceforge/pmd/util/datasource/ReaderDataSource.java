@@ -10,14 +10,16 @@ import java.io.Reader;
 
 import org.apache.commons.io.input.ReaderInputStream;
 
+import net.sourceforge.pmd.util.datasource.internal.AbstractDataSource;
+
 /**
  * DataSource implementation to read data from a Reader.
  */
-public class ReaderDataSource implements DataSource {
+public class ReaderDataSource extends AbstractDataSource {
     /**
      * Reader
      */
-    private Reader reader;
+    private final Reader reader;
 
     /**
      * Real or pseudo filename or path name.
@@ -86,6 +88,10 @@ public class ReaderDataSource implements DataSource {
 
     @Override
     public String toString() {
-        return dataSourceName;
+        return new StringBuilder(ReaderDataSource.class.getSimpleName())
+                .append('[')
+                .append(dataSourceName)
+                .append(']')
+                .toString();
     }
 }

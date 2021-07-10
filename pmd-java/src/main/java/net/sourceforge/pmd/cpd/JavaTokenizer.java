@@ -4,19 +4,22 @@
 
 package net.sourceforge.pmd.cpd;
 
+import java.io.IOException;
 import java.io.StringReader;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.Properties;
 
-import net.sourceforge.pmd.lang.LanguageRegistry;
-import net.sourceforge.pmd.lang.LanguageVersionHandler;
+import net.sourceforge.pmd.cpd.internal.JavaCCTokenizer;
+import net.sourceforge.pmd.cpd.token.JavaCCTokenFilter;
+import net.sourceforge.pmd.cpd.token.TokenFilter;
 import net.sourceforge.pmd.lang.TokenManager;
-import net.sourceforge.pmd.lang.java.JavaLanguageModule;
+import net.sourceforge.pmd.lang.ast.GenericToken;
+import net.sourceforge.pmd.lang.java.JavaTokenManager;
 import net.sourceforge.pmd.lang.java.ast.JavaParserConstants;
 import net.sourceforge.pmd.lang.java.ast.Token;
 
-public class JavaTokenizer implements Tokenizer {
+public class JavaTokenizer extends JavaCCTokenizer {
 
     public static final String CPD_START = "\"CPD-START\"";
     public static final String CPD_END = "\"CPD-END\"";
@@ -25,59 +28,51 @@ public class JavaTokenizer implements Tokenizer {
     private boolean ignoreLiterals;
     private boolean ignoreIdentifiers;
 
+    private ConstructorDetector constructorDetector;
+
     public void setProperties(Properties properties) {
         ignoreAnnotations = Boolean.parseBoolean(properties.getProperty(IGNORE_ANNOTATIONS, "false"));
         ignoreLiterals = Boolean.parseBoolean(properties.getProperty(IGNORE_LITERALS, "false"));
         ignoreIdentifiers = Boolean.parseBoolean(properties.getProperty(IGNORE_IDENTIFIERS, "false"));
     }
 
-    public void tokenize(SourceCode sourceCode, Tokens tokenEntries) {
-        StringBuilder stringBuilder = sourceCode.getCodeBuffer();
-
-        // Note that Java version is irrelevant for tokenizing
-        LanguageVersionHandler languageVersionHandler = LanguageRegistry.getLanguage(JavaLanguageModule.NAME)
-                .getVersion("1.4").getLanguageVersionHandler();
-        String fileName = sourceCode.getFileName();
-        TokenManager tokenMgr = languageVersionHandler.getParser(languageVersionHandler.getDefaultParserOptions())
-                .getTokenManager(fileName, new StringReader(stringBuilder.toString()));
-        Token currentToken = (Token) tokenMgr.getNextToken();
-
-        TokenDiscarder discarder = new TokenDiscarder(ignoreAnnotations);
-        ConstructorDetector constructorDetector = new ConstructorDetector(ignoreIdentifiers);
-
-        while (currentToken.image.length() > 0) {
-            discarder.updateState(currentToken);
-
-            if (discarder.isDiscarding()) {
-                currentToken = (Token) tokenMgr.getNextToken();
-                continue;
-            }
-
-            processToken(tokenEntries, fileName, currentToken, constructorDetector);
-            currentToken = (Token) tokenMgr.getNextToken();
-        }
-        tokenEntries.add(TokenEntry.getEOF());
+    @Override
+    public void tokenize(SourceCode sourceCode, Tokens tokenEntries) throws IOException {
+        constructorDetector = new ConstructorDetector(ignoreIdentifiers);
+        super.tokenize(sourceCode, tokenEntries);
     }
 
-    private void processToken(Tokens tokenEntries, String fileName, Token currentToken,
-            ConstructorDetector constructorDetector) {
-        String image = currentToken.image;
+    @Override
+    protected TokenManager getLexerForSource(SourceCode sourceCode) {
+        final StringBuilder stringBuilder = sourceCode.getCodeBuffer();
+        return new JavaTokenManager(new StringReader(stringBuilder.toString()));
+    }
 
-        constructorDetector.restoreConstructorToken(tokenEntries, currentToken);
+    @Override
+    protected TokenFilter getTokenFilter(TokenManager tokenManager) {
+        return new JavaTokenFilter(tokenManager, ignoreAnnotations);
+    }
 
-        if (ignoreLiterals && (currentToken.kind == JavaParserConstants.STRING_LITERAL
-                || currentToken.kind == JavaParserConstants.CHARACTER_LITERAL
-                || currentToken.kind == JavaParserConstants.DECIMAL_LITERAL
-                || currentToken.kind == JavaParserConstants.FLOATING_POINT_LITERAL)) {
-            image = String.valueOf(currentToken.kind);
+    @Override
+    protected TokenEntry processToken(Tokens tokenEntries, GenericToken currentToken, String fileName) {
+        String image = currentToken.getImage();
+        Token javaToken = (Token) currentToken;
+
+        constructorDetector.restoreConstructorToken(tokenEntries, javaToken);
+
+        if (ignoreLiterals && (javaToken.kind == JavaParserConstants.STRING_LITERAL
+                || javaToken.kind == JavaParserConstants.CHARACTER_LITERAL
+                || javaToken.kind == JavaParserConstants.DECIMAL_LITERAL
+                || javaToken.kind == JavaParserConstants.FLOATING_POINT_LITERAL)) {
+            image = String.valueOf(javaToken.kind);
         }
-        if (ignoreIdentifiers && currentToken.kind == JavaParserConstants.IDENTIFIER) {
-            image = String.valueOf(currentToken.kind);
+        if (ignoreIdentifiers && javaToken.kind == JavaParserConstants.IDENTIFIER) {
+            image = String.valueOf(javaToken.kind);
         }
 
-        constructorDetector.processToken(currentToken);
+        constructorDetector.processToken(javaToken);
 
-        tokenEntries.add(new TokenEntry(image, fileName, currentToken.beginLine));
+        return new TokenEntry(image, fileName, currentToken.getBeginLine(), currentToken.getBeginColumn(), currentToken.getEndColumn());
     }
 
     public void setIgnoreLiterals(boolean ignore) {
@@ -93,15 +88,14 @@ public class JavaTokenizer implements Tokenizer {
     }
 
     /**
-     * The {@link TokenDiscarder} consumes token by token and maintains state.
-     * It can detect, whether the current token belongs to an annotation and
-     * whether the current token should be discarded by CPD.
+     * The {@link JavaTokenFilter} extends the {@link JavaCCTokenFilter} to discard
+     * Java-specific tokens.
      * <p>
      * By default, it discards semicolons, package and import statements, and
-     * enables CPD suppression. Optionally, all annotations can be ignored, too.
+     * enables annotation-based CPD suppression. Optionally, all annotations can be ignored, too.
      * </p>
      */
-    private static class TokenDiscarder {
+    private static class JavaTokenFilter extends JavaCCTokenFilter {
         private boolean isAnnotation = false;
         private boolean nextTokenEndsAnnotation = false;
         private int annotationStack = 0;
@@ -112,22 +106,24 @@ public class JavaTokenizer implements Tokenizer {
         private boolean discardingAnnotations = false;
         private boolean ignoreAnnotations = false;
 
-        TokenDiscarder(boolean ignoreAnnotations) {
+        JavaTokenFilter(final TokenManager tokenManager, final boolean ignoreAnnotations) {
+            super(tokenManager);
             this.ignoreAnnotations = ignoreAnnotations;
         }
 
-        public void updateState(Token currentToken) {
-            detectAnnotations(currentToken);
+        @Override
+        protected void analyzeToken(final GenericToken currentToken) {
+            detectAnnotations((Token) currentToken);
 
-            skipSemicolon(currentToken);
-            skipPackageAndImport(currentToken);
-            skipCPDSuppression(currentToken);
+            skipSemicolon((Token) currentToken);
+            skipPackageAndImport((Token) currentToken);
+            skipAnnotationSuppression((Token) currentToken);
             if (ignoreAnnotations) {
                 skipAnnotations();
             }
         }
 
-        private void skipPackageAndImport(Token currentToken) {
+        private void skipPackageAndImport(final Token currentToken) {
             if (currentToken.kind == JavaParserConstants.PACKAGE || currentToken.kind == JavaParserConstants.IMPORT) {
                 discardingKeywords = true;
             } else if (discardingKeywords && currentToken.kind == JavaParserConstants.SEMICOLON) {
@@ -135,7 +131,7 @@ public class JavaTokenizer implements Tokenizer {
             }
         }
 
-        private void skipSemicolon(Token currentToken) {
+        private void skipSemicolon(final Token currentToken) {
             if (currentToken.kind == JavaParserConstants.SEMICOLON) {
                 discardingSemicolon = true;
             } else if (discardingSemicolon && currentToken.kind != JavaParserConstants.SEMICOLON) {
@@ -143,21 +139,7 @@ public class JavaTokenizer implements Tokenizer {
             }
         }
 
-        private void skipCPDSuppression(Token currentToken) {
-            // Check if a comment is altering the suppression state
-            Token st = currentToken.specialToken;
-            while (st != null) {
-                if (st.image.contains("CPD-OFF")) {
-                    discardingSuppressing = true;
-                    break;
-                }
-                if (st.image.contains("CPD-ON")) {
-                    discardingSuppressing = false;
-                    break;
-                }
-                st = st.specialToken;
-            }
-
+        private void skipAnnotationSuppression(final Token currentToken) {
             // if processing an annotation, look for a CPD-START or CPD-END
             if (isAnnotation) {
                 if (!discardingSuppressing && currentToken.kind == JavaParserConstants.STRING_LITERAL
@@ -178,10 +160,10 @@ public class JavaTokenizer implements Tokenizer {
             }
         }
 
-        public boolean isDiscarding() {
-            boolean result = discardingSemicolon || discardingKeywords || discardingAnnotations
+        @Override
+        protected boolean isLanguageSpecificDiscarding() {
+            return discardingSemicolon || discardingKeywords || discardingAnnotations
                     || discardingSuppressing;
-            return result;
         }
 
         private void detectAnnotations(Token currentToken) {
@@ -226,7 +208,7 @@ public class JavaTokenizer implements Tokenizer {
             this.ignoreIdentifiers = ignoreIdentifiers;
 
             currentNestingLevel = 0;
-            classMembersIndentations = new LinkedList<TypeDeclaration>();
+            classMembersIndentations = new LinkedList<>();
         }
 
         public void processToken(Token currentToken) {

@@ -5,6 +5,7 @@
 package net.sourceforge.pmd.lang.java.xpath;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.apache.commons.lang3.EnumUtils;
@@ -14,17 +15,27 @@ import org.jaxen.FunctionCallException;
 import org.jaxen.SimpleFunctionContext;
 import org.jaxen.XPathFunctionContext;
 
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.lang.java.ast.ASTAnyTypeDeclaration;
-import net.sourceforge.pmd.lang.java.ast.ASTMethodOrConstructorDeclaration;
-import net.sourceforge.pmd.lang.java.metrics.JavaMetrics;
+import net.sourceforge.pmd.lang.java.ast.MethodLikeNode;
 import net.sourceforge.pmd.lang.java.metrics.api.JavaClassMetricKey;
 import net.sourceforge.pmd.lang.java.metrics.api.JavaOperationMetricKey;
+import net.sourceforge.pmd.lang.metrics.MetricKey;
+import net.sourceforge.pmd.lang.metrics.MetricsUtil;
+
 
 /**
+ * Implements the {@code metric()} XPath function. Takes the
+ * string name of a metric and the context node and returns
+ * the result if the metric can be computed, otherwise returns
+ * {@link Double#NaN}.
+ *
  * @author Clément Fournier
  * @since 6.0.0
  */
+@InternalApi
+@Deprecated
 public class MetricFunction implements Function {
 
 
@@ -35,9 +46,7 @@ public class MetricFunction implements Function {
     @Override
     public Object call(Context context, List args) throws FunctionCallException {
 
-        String metricKeyName = null;
-
-        if (args.size() == 0) {
+        if (args.isEmpty()) {
             throw new IllegalArgumentException(badMetricKeyArgMessage());
         }
 
@@ -45,9 +54,9 @@ public class MetricFunction implements Function {
             throw new IllegalArgumentException(badMetricKeyArgMessage());
         }
 
-        metricKeyName = (String) args.get(0);
-
+        String metricKeyName = (String) args.get(0);
         Node n = (Node) context.getNodeSet().get(0);
+
         return getMetric(n, metricKeyName);
     }
 
@@ -74,17 +83,21 @@ public class MetricFunction implements Function {
 
     public static double getMetric(Node n, String metricKeyName) {
         if (n instanceof ASTAnyTypeDeclaration) {
-            return getClassMetric((ASTAnyTypeDeclaration) n, getClassMetricKey(metricKeyName));
-        } else if (n instanceof ASTMethodOrConstructorDeclaration) {
-            return getOpMetric((ASTMethodOrConstructorDeclaration) n, getOperationMetricKey(metricKeyName));
+            return computeMetric(getClassMetricKey(metricKeyName), (ASTAnyTypeDeclaration) n);
+        } else if (n instanceof MethodLikeNode) {
+            return computeMetric(getOperationMetricKey(metricKeyName), (MethodLikeNode) n);
         } else {
             throw new IllegalStateException(genericBadNodeMessage());
         }
     }
 
+    private static <T extends Node> double computeMetric(MetricKey<T> metricKey, T n) {
+        return metricKey.supports(n) ? MetricsUtil.computeMetric(metricKey, n) : Double.NaN;
+    }
+
 
     private static JavaClassMetricKey getClassMetricKey(String s) {
-        String constantName = s.toUpperCase();
+        String constantName = s.toUpperCase(Locale.ROOT);
         if (!CLASS_METRIC_KEY_MAP.containsKey(constantName)) {
             throw new IllegalArgumentException(badClassMetricKeyMessage());
         }
@@ -93,21 +106,11 @@ public class MetricFunction implements Function {
 
 
     private static JavaOperationMetricKey getOperationMetricKey(String s) {
-        String constantName = s.toUpperCase();
+        String constantName = s.toUpperCase(Locale.ROOT);
         if (!OPERATION_METRIC_KEY_MAP.containsKey(constantName)) {
             throw new IllegalArgumentException(badOperationMetricKeyMessage());
         }
         return OPERATION_METRIC_KEY_MAP.get(constantName);
-    }
-
-
-    private static double getOpMetric(ASTMethodOrConstructorDeclaration node, JavaOperationMetricKey key) {
-        return JavaMetrics.get(key, node);
-    }
-
-
-    private static double getClassMetric(ASTAnyTypeDeclaration node, JavaClassMetricKey key) {
-        return JavaMetrics.get(key, node);
     }
 
 

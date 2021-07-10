@@ -21,7 +21,7 @@ import net.sourceforge.pmd.properties.PropertyDescriptor;
  *
  * @see Renderer
  */
-public class RendererFactory {
+public final class RendererFactory {
 
     private static final Logger LOG = Logger.getLogger(RendererFactory.class.getName());
 
@@ -43,6 +43,8 @@ public class RendererFactory {
         map.put(SummaryHTMLRenderer.NAME, SummaryHTMLRenderer.class);
         map.put(VBHTMLRenderer.NAME, VBHTMLRenderer.class);
         map.put(EmptyRenderer.NAME, EmptyRenderer.class);
+        map.put(JsonRenderer.NAME, JsonRenderer.class);
+        map.put(SarifRenderer.NAME, SarifRenderer.class);
         REPORT_FORMAT_TO_RENDERER = Collections.unmodifiableMap(map);
     }
 
@@ -80,13 +82,12 @@ public class RendererFactory {
                     }
                 }
             }
-        } catch (InstantiationException e) {
-            throw new IllegalArgumentException("Unable to construct report renderer class: " + e.getLocalizedMessage());
-        } catch (IllegalAccessException e) {
-            throw new IllegalArgumentException("Unable to construct report renderer class: " + e.getLocalizedMessage());
+        } catch (InstantiationException | IllegalAccessException e) {
+            throw new IllegalArgumentException(
+                    "Unable to construct report renderer class: " + e.getLocalizedMessage(), e);
         } catch (InvocationTargetException e) {
             throw new IllegalArgumentException(
-                    "Unable to construct report renderer class: " + e.getTargetException().getLocalizedMessage());
+                    "Unable to construct report renderer class: " + e.getTargetException().getLocalizedMessage(), e);
         }
         // Warn about legacy report format usages
         if (REPORT_FORMAT_TO_RENDERER.containsKey(reportFormat) && !reportFormat.equals(renderer.getName())) {
@@ -129,8 +130,8 @@ public class RendererFactory {
             if (!Modifier.isPublic(constructor.getModifiers())) {
                 constructor = null;
             }
-        } catch (NoSuchMethodException e) {
-            // Ok
+        } catch (NoSuchMethodException ignored) {
+            // Ignored, we'll check default constructor next
         }
 
         // 2) No-arg constructor?
@@ -139,8 +140,8 @@ public class RendererFactory {
             if (!Modifier.isPublic(constructor.getModifiers())) {
                 constructor = null;
             }
-        } catch (NoSuchMethodException e2) {
-            // Ok
+        } catch (NoSuchMethodException ignored) {
+            // Ignored, we'll eventually throw an exception, if there is no constructor
         }
 
         if (constructor == null) {

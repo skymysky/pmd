@@ -30,7 +30,7 @@ public abstract class AbstractIncrementingRenderer extends AbstractRenderer {
      * Accumulated processing errors.
      */
     protected List<Report.ProcessingError> errors = new LinkedList<>();
-    
+
     /**
      * Accumulated configuration errors.
      */
@@ -45,23 +45,16 @@ public abstract class AbstractIncrementingRenderer extends AbstractRenderer {
         super(name, description);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void start() throws IOException {
+        // does nothing - override if necessary
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void startFileAnalysis(DataSource dataSource) {
+        // does nothing - override if necessary
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void renderFileReport(Report report) throws IOException {
         Iterator<RuleViolation> violations = report.iterator();
@@ -73,7 +66,7 @@ public abstract class AbstractIncrementingRenderer extends AbstractRenderer {
         for (Iterator<Report.ProcessingError> i = report.errors(); i.hasNext();) {
             errors.add(i.next());
         }
-        
+
         for (Iterator<Report.ConfigurationError> i = report.configErrors(); i.hasNext();) {
             configErrors.add(i.next());
         }
@@ -92,10 +85,8 @@ public abstract class AbstractIncrementingRenderer extends AbstractRenderer {
      */
     public abstract void renderFileViolations(Iterator<RuleViolation> violations) throws IOException;
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void end() throws IOException {
+        // does nothing - override if necessary
     }
 }

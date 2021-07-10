@@ -4,6 +4,8 @@ package net.sourceforge.pmd.lang.vm.ast;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import net.sourceforge.pmd.annotation.InternalApi;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,37 +22,34 @@ import org.apache.commons.lang3.StringUtils;
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
- * under the License.    
+ * under the License.
  */
 
 /**
  * ASTMethod.java
- * 
+ *
  * Method support for references : $foo.method()
- * 
+ *
  * NOTE :
- * 
+ *
  * introspection is now done at render time.
- * 
+ *
  * Please look at the Parser.jjt file which is what controls the generation of
  * this class.
- * 
+ *
  * @author <a href="mailto:jvanzyl@apache.org">Jason van Zyl</a>
  * @author <a href="mailto:geirm@optonline.net">Geir Magnusson Jr.</a>
  * @version $Id: ASTMethod.java 720228 2008-11-24 16:58:33Z nbubna $
  */
 public class ASTMethod extends AbstractVmNode {
-    /**
-     * @param id
-     */
+    @InternalApi
+    @Deprecated
     public ASTMethod(final int id) {
         super(id);
     }
 
-    /**
-     * @param p
-     * @param id
-     */
+    @InternalApi
+    @Deprecated
     public ASTMethod(final VmParser p, final int id) {
         super(p, id);
     }
@@ -64,9 +63,11 @@ public class ASTMethod extends AbstractVmNode {
      * Internal class used as key for method cache. Combines ASTMethod fields
      * with array of parameter classes. Has public access (and complete
      * constructor) for unit test purposes.
-     * 
+     *
      * @since 1.5
+     * @deprecated for removal in PMD 7.0.0 - it's not used anywhere
      */
+    @Deprecated
     public static class MethodCacheKey {
         private final String methodName;
 

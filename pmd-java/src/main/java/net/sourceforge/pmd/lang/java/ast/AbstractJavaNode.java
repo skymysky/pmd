@@ -4,24 +4,33 @@
 
 package net.sourceforge.pmd.lang.java.ast;
 
-import net.sourceforge.pmd.lang.ast.AbstractNode;
+import net.sourceforge.pmd.annotation.InternalApi;
+import net.sourceforge.pmd.lang.ast.impl.javacc.AbstractJjtreeNode;
 import net.sourceforge.pmd.lang.symboltable.Scope;
 
-public abstract class AbstractJavaNode extends AbstractNode implements JavaNode {
+@Deprecated
+@InternalApi
+public abstract class AbstractJavaNode extends AbstractJjtreeNode<JavaNode> implements JavaNode {
 
     protected JavaParser parser;
     private Scope scope;
     private Comment comment;
+    private ASTCompilationUnit root;
 
+    @InternalApi
+    @Deprecated
     public AbstractJavaNode(int id) {
         super(id);
     }
 
+    @InternalApi
+    @Deprecated
     public AbstractJavaNode(JavaParser parser, int id) {
         super(id);
         this.parser = parser;
     }
 
+    @Override
     public void jjtOpen() {
         if (beginLine == -1 && parser.token.next != null) {
             beginLine = parser.token.next.beginLine;
@@ -29,6 +38,7 @@ public abstract class AbstractJavaNode extends AbstractNode implements JavaNode 
         }
     }
 
+    @Override
     public void jjtClose() {
         if (beginLine == -1 && (children == null || children.length == 0)) {
             beginColumn = parser.token.beginColumn;
@@ -40,16 +50,12 @@ public abstract class AbstractJavaNode extends AbstractNode implements JavaNode 
         endColumn = parser.token.endColumn;
     }
 
-    /**
-     * Accept the visitor. *
-     */
+    @Override
     public Object jjtAccept(JavaParserVisitor visitor, Object data) {
         return visitor.visit(this, data);
     }
 
-    /**
-     * Accept the visitor. *
-     */
+    @Override
     public Object childrenAccept(JavaParserVisitor visitor, Object data) {
         if (children != null) {
             for (int i = 0; i < children.length; ++i) {
@@ -59,6 +65,15 @@ public abstract class AbstractJavaNode extends AbstractNode implements JavaNode 
         return data;
     }
 
+    @Override
+    public ASTCompilationUnit getRoot() {
+        if (root == null) {
+            root = getParent().getRoot();
+        }
+        return root;
+    }
+
+    @Override
     public Scope getScope() {
         if (scope == null) {
             return ((JavaNode) parent).getScope();
@@ -66,10 +81,15 @@ public abstract class AbstractJavaNode extends AbstractNode implements JavaNode 
         return scope;
     }
 
+    @InternalApi
+    @Deprecated
+    @Override
     public void setScope(Scope scope) {
         this.scope = scope;
     }
 
+    @InternalApi
+    @Deprecated
     public void comment(Comment theComment) {
         comment = theComment;
     }
@@ -78,7 +98,9 @@ public abstract class AbstractJavaNode extends AbstractNode implements JavaNode 
         return comment;
     }
 
-    public String toString() {
+
+    @Override
+    public final String getXPathNodeName() {
         return JavaParserTreeConstants.jjtNodeName[id];
     }
 }

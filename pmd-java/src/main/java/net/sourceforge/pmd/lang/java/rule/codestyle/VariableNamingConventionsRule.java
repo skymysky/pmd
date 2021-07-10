@@ -4,7 +4,10 @@
 
 package net.sourceforge.pmd.lang.java.rule.codestyle;
 
+import static net.sourceforge.pmd.properties.PropertyFactory.booleanProperty;
+
 import java.util.List;
+import java.util.Locale;
 
 import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.lang.java.ast.ASTAnnotationTypeDeclaration;
@@ -18,10 +21,10 @@ import net.sourceforge.pmd.lang.java.ast.ASTMethodDeclaration;
 import net.sourceforge.pmd.lang.java.ast.ASTVariableDeclarator;
 import net.sourceforge.pmd.lang.java.ast.ASTVariableDeclaratorId;
 import net.sourceforge.pmd.lang.java.rule.AbstractJavaRule;
-import net.sourceforge.pmd.properties.BooleanProperty;
 import net.sourceforge.pmd.properties.PropertyDescriptor;
 import net.sourceforge.pmd.properties.StringMultiProperty;
 
+@Deprecated
 public class VariableNamingConventionsRule extends AbstractJavaRule {
 
     private boolean checkMembers;
@@ -37,18 +40,15 @@ public class VariableNamingConventionsRule extends AbstractJavaRule {
     private List<String> parameterPrefixes;
     private List<String> parameterSuffixes;
 
-    private static final BooleanProperty CHECK_MEMBERS_DESCRIPTOR = new BooleanProperty("checkMembers",
-            "Check member variables", true, 1.0f);
+    private static final PropertyDescriptor<Boolean> CHECK_MEMBERS_DESCRIPTOR = booleanProperty("checkMembers").defaultValue(true).desc("Check member variables").build();
 
-    private static final BooleanProperty CHECK_LOCALS_DESCRIPTOR = new BooleanProperty("checkLocals",
-            "Check local variables", true, 2.0f);
+    private static final PropertyDescriptor<Boolean> CHECK_LOCALS_DESCRIPTOR = booleanProperty("checkLocals").defaultValue(true).desc("Check local variables").build();
 
-    private static final BooleanProperty CHECK_PARAMETERS_DESCRIPTOR = new BooleanProperty("checkParameters",
-            "Check constructor and method parameter variables", true, 3.0f);
+    private static final PropertyDescriptor<Boolean> CHECK_PARAMETERS_DESCRIPTOR = booleanProperty("checkParameters").defaultValue(true).desc("Check constructor and method parameter variables").build();
 
-    private static final BooleanProperty CHECK_NATIVE_METHOD_PARAMETERS_DESCRIPTOR = new BooleanProperty(
-            "checkNativeMethodParameters", "Check method parameter of native methods", true, 3.5f);
+    private static final PropertyDescriptor<Boolean> CHECK_NATIVE_METHOD_PARAMETERS_DESCRIPTOR = booleanProperty("checkNativeMethodParameters").defaultValue(true).desc("Check method parameter of native methods").build();
 
+    // the rule is deprecated and will be removed so its properties won't be converted
     private static final StringMultiProperty STATIC_PREFIXES_DESCRIPTOR = new StringMultiProperty("staticPrefix",
             "Static variable prefixes", new String[] { "" }, 4.0f, ',');
 
@@ -88,6 +88,7 @@ public class VariableNamingConventionsRule extends AbstractJavaRule {
         definePropertyDescriptor(PARAMETER_SUFFIXES_DESCRIPTOR);
     }
 
+    @Override
     public Object visit(ASTCompilationUnit node, Object data) {
         init();
         return super.visit(node, data);
@@ -108,6 +109,7 @@ public class VariableNamingConventionsRule extends AbstractJavaRule {
         parameterSuffixes = getProperty(PARAMETER_SUFFIXES_DESCRIPTOR);
     }
 
+    @Override
     public Object visit(ASTFieldDeclaration node, Object data) {
         if (!checkMembers) {
             return data;
@@ -115,7 +117,7 @@ public class VariableNamingConventionsRule extends AbstractJavaRule {
         boolean isStatic = node.isStatic();
         boolean isFinal = node.isFinal();
 
-        Node type = node.jjtGetParent().jjtGetParent().jjtGetParent();
+        Node type = node.getParent().getParent().getParent();
         // Anything from an interface is necessarily static and final
         // Anything inside an annotation type is also static and final
         if (type instanceof ASTClassOrInterfaceDeclaration && ((ASTClassOrInterfaceDeclaration) type).isInterface()
@@ -127,6 +129,7 @@ public class VariableNamingConventionsRule extends AbstractJavaRule {
                 isStatic ? staticSuffixes : memberSuffixes, node, isStatic, isFinal, data);
     }
 
+    @Override
     public Object visit(ASTLocalVariableDeclaration node, Object data) {
         if (!checkLocals) {
             return data;
@@ -134,6 +137,7 @@ public class VariableNamingConventionsRule extends AbstractJavaRule {
         return checkVariableDeclarators(localPrefixes, localSuffixes, node, false, node.isFinal(), data);
     }
 
+    @Override
     public Object visit(ASTFormalParameters node, Object data) {
         if (!checkParameters) {
             return data;
@@ -146,7 +150,7 @@ public class VariableNamingConventionsRule extends AbstractJavaRule {
         for (ASTFormalParameter formalParameter : node.findChildrenOfType(ASTFormalParameter.class)) {
             for (ASTVariableDeclaratorId variableDeclaratorId : formalParameter
                     .findChildrenOfType(ASTVariableDeclaratorId.class)) {
-                checkVariableDeclaratorId(parameterPrefixes, parameterSuffixes, node, false, formalParameter.isFinal(),
+                checkVariableDeclaratorId(parameterPrefixes, parameterSuffixes, false, formalParameter.isFinal(),
                         variableDeclaratorId, data);
             }
         }
@@ -158,13 +162,13 @@ public class VariableNamingConventionsRule extends AbstractJavaRule {
         for (ASTVariableDeclarator variableDeclarator : root.findChildrenOfType(ASTVariableDeclarator.class)) {
             for (ASTVariableDeclaratorId variableDeclaratorId : variableDeclarator
                     .findChildrenOfType(ASTVariableDeclaratorId.class)) {
-                checkVariableDeclaratorId(prefixes, suffixes, root, isStatic, isFinal, variableDeclaratorId, data);
+                checkVariableDeclaratorId(prefixes, suffixes, isStatic, isFinal, variableDeclaratorId, data);
             }
         }
         return data;
     }
 
-    private Object checkVariableDeclaratorId(List<String> prefixes, List<String> suffixes, Node root, boolean isStatic,
+    private Object checkVariableDeclaratorId(List<String> prefixes, List<String> suffixes, boolean isStatic,
             boolean isFinal, ASTVariableDeclaratorId variableDeclaratorId, Object data) {
 
         // Get the variable name
@@ -177,7 +181,7 @@ public class VariableNamingConventionsRule extends AbstractJavaRule {
 
         // Static finals should be uppercase
         if (isStatic && isFinal) {
-            if (!varName.equals(varName.toUpperCase())) {
+            if (!varName.equals(varName.toUpperCase(Locale.ROOT))) {
                 addViolationWithMessage(data, variableDeclaratorId,
                         "Variables that are final and static should be all capitals, ''{0}'' is not all capitals.",
                         new Object[] { varName });
@@ -240,6 +244,7 @@ public class VariableNamingConventionsRule extends AbstractJavaRule {
         return false;
     }
 
+    @Override
     public String dysfunctionReason() {
         return hasPrefixesOrSuffixes() ? null : "No prefixes or suffixes specified";
     }

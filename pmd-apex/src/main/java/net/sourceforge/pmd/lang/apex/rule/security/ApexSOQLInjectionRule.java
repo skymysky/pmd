@@ -7,6 +7,9 @@ package net.sourceforge.pmd.lang.apex.rule.security;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import net.sourceforge.pmd.lang.apex.ast.ASTAssignmentExpression;
@@ -15,20 +18,19 @@ import net.sourceforge.pmd.lang.apex.ast.ASTFieldDeclaration;
 import net.sourceforge.pmd.lang.apex.ast.ASTLiteralExpression;
 import net.sourceforge.pmd.lang.apex.ast.ASTMethod;
 import net.sourceforge.pmd.lang.apex.ast.ASTMethodCallExpression;
+import net.sourceforge.pmd.lang.apex.ast.ASTParameter;
 import net.sourceforge.pmd.lang.apex.ast.ASTStandardCondition;
 import net.sourceforge.pmd.lang.apex.ast.ASTUserClass;
 import net.sourceforge.pmd.lang.apex.ast.ASTVariableDeclaration;
 import net.sourceforge.pmd.lang.apex.ast.ASTVariableExpression;
-import net.sourceforge.pmd.lang.apex.ast.AbstractApexNode;
+import net.sourceforge.pmd.lang.apex.ast.ApexNode;
 import net.sourceforge.pmd.lang.apex.rule.AbstractApexRule;
-
-import apex.jorje.semantic.ast.member.Parameter;
-import apex.jorje.semantic.ast.statement.VariableDeclaration;
+import net.sourceforge.pmd.lang.apex.rule.internal.Helper;
 
 /**
  * Detects if variables in Database.query(variable) is escaped with
  * String.escapeSingleQuotes
- * 
+ *
  * @author sergey.gorbaty
  *
  */
@@ -45,10 +47,11 @@ public class ApexSOQLInjectionRule extends AbstractApexRule {
     private static final String DATABASE = "Database";
     private static final String QUERY = "query";
     private static final Pattern SELECT_PATTERN = Pattern.compile("^select[\\s]+?.*?$", Pattern.CASE_INSENSITIVE);
-    private final HashSet<String> safeVariables = new HashSet<>();
-    private final HashMap<String, Boolean> selectContainingVariables = new HashMap<>();
+    private final Set<String> safeVariables = new HashSet<>();
+    private final Map<String, Boolean> selectContainingVariables = new HashMap<>();
 
     public ApexSOQLInjectionRule() {
+        addRuleChainVisit(ASTUserClass.class);
         setProperty(CODECLIMATE_CATEGORIES, "Security");
         setProperty(CODECLIMATE_REMEDIATION_MULTIPLIER, 100);
         setProperty(CODECLIMATE_BLOCK_HIGHLIGHTING, false);
@@ -104,9 +107,8 @@ public class ApexSOQLInjectionRule extends AbstractApexRule {
     }
 
     private void findSafeVariablesInSignature(ASTMethod m) {
-        List<Parameter> parameters = m.getNode().getMethodInfo().getParameters();
-        for (Parameter p : parameters) {
-            switch (p.getType().getApexName().toLowerCase()) {
+        for (ASTParameter p : m.findChildrenOfType(ASTParameter.class)) {
+            switch (p.getType().toLowerCase(Locale.ROOT)) {
             case ID:
             case INTEGER:
             case BOOLEAN:
@@ -123,7 +125,7 @@ public class ApexSOQLInjectionRule extends AbstractApexRule {
 
     }
 
-    private void findSanitizedVariables(AbstractApexNode<?> node) {
+    private void findSanitizedVariables(ApexNode<?> node) {
         final ASTVariableExpression left = node.getFirstChildOfType(ASTVariableExpression.class);
         final ASTLiteralExpression literal = node.getFirstChildOfType(ASTLiteralExpression.class);
         final ASTMethodCallExpression right = node.getFirstChildOfType(ASTMethodCallExpression.class);
@@ -131,13 +133,12 @@ public class ApexSOQLInjectionRule extends AbstractApexRule {
         // look for String a = 'b';
         if (literal != null) {
             if (left != null) {
-                Object o = literal.getNode().getLiteral();
-                if (o instanceof Integer || o instanceof Boolean || o instanceof Double) {
+                if (literal.isInteger() || literal.isBoolean() || literal.isDouble()) {
                     safeVariables.add(Helper.getFQVariableName(left));
                 }
 
-                if (o instanceof String) {
-                    if (SELECT_PATTERN.matcher((String) o).matches()) {
+                if (literal.isString()) {
+                    if (SELECT_PATTERN.matcher(literal.getImage()).matches()) {
                         selectContainingVariables.put(Helper.getFQVariableName(left), Boolean.TRUE);
                     } else {
                         safeVariables.add(Helper.getFQVariableName(left));
@@ -156,8 +157,7 @@ public class ApexSOQLInjectionRule extends AbstractApexRule {
         }
 
         if (node instanceof ASTVariableDeclaration) {
-            VariableDeclaration o = (VariableDeclaration) node.getNode();
-            switch (o.getLocalInfo().getType().getApexName().toLowerCase()) {
+            switch (((ASTVariableDeclaration) node).getType().toLowerCase(Locale.ROOT)) {
             case INTEGER:
             case ID:
             case BOOLEAN:
@@ -172,7 +172,7 @@ public class ApexSOQLInjectionRule extends AbstractApexRule {
         }
     }
 
-    private void findSelectContainingVariables(AbstractApexNode<?> node) {
+    private void findSelectContainingVariables(ApexNode<?> node) {
         final ASTVariableExpression left = node.getFirstChildOfType(ASTVariableExpression.class);
         final ASTBinaryExpression right = node.getFirstChildOfType(ASTBinaryExpression.class);
         if (left != null && right != null) {
@@ -204,10 +204,8 @@ public class ApexSOQLInjectionRule extends AbstractApexRule {
 
         final ASTLiteralExpression literal = node.getFirstChildOfType(ASTLiteralExpression.class);
         if (literal != null) {
-
-            Object o = literal.getNode().getLiteral();
-            if (o instanceof String) {
-                if (SELECT_PATTERN.matcher((String) o).matches()) {
+            if (literal.isString()) {
+                if (SELECT_PATTERN.matcher(literal.getImage()).matches()) {
                     if (!isSafeVariable) {
                         // select literal + other unsafe vars
                         selectContainingVariables.put(Helper.getFQVariableName(var), Boolean.FALSE);

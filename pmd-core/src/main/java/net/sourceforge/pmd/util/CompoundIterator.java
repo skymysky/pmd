@@ -7,6 +7,8 @@ package net.sourceforge.pmd.util;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import net.sourceforge.pmd.annotation.InternalApi;
+
 /**
  * Creates a single compound Iterator from an array of Iterators.
  *
@@ -15,6 +17,8 @@ import java.util.NoSuchElementException;
  *
  * @see Iterator
  */
+@InternalApi
+@Deprecated
 public class CompoundIterator<T> implements Iterator<T> {
     private final Iterator<T>[] iterators;
     private int index;
@@ -29,17 +33,11 @@ public class CompoundIterator<T> implements Iterator<T> {
         this.index = 0;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean hasNext() {
         return getNextIterator() != null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public T next() {
         Iterator<T> iterator = getNextIterator();
@@ -50,9 +48,6 @@ public class CompoundIterator<T> implements Iterator<T> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void remove() {
         Iterator<T> iterator = getNextIterator();

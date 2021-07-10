@@ -6,6 +6,8 @@ package net.sourceforge.pmd.lang;
 
 import org.jaxen.Navigator;
 
+import net.sourceforge.pmd.annotation.InternalApi;
+import net.sourceforge.pmd.lang.ast.xpath.DefaultASTXPathHandler;
 import net.sourceforge.pmd.lang.xpath.Initializer;
 
 import net.sf.saxon.sxpath.IndependentContext;
@@ -14,22 +16,11 @@ import net.sf.saxon.sxpath.IndependentContext;
  * Interface for performing Language specific XPath handling, such as
  * initialization and navigation.
  */
+@InternalApi
+@Deprecated
 public interface XPathHandler {
 
-    XPathHandler DUMMY = new XPathHandler() {
-        @Override
-        public void initialize() {
-        }
-
-        @Override
-        public void initialize(IndependentContext context) {
-        }
-
-        @Override
-        public Navigator getNavigator() {
-            return null;
-        }
-    };
+    XPathHandler DUMMY = new DefaultASTXPathHandler();
 
     /**
      * Initialize. This is intended to be called by {@link Initializer} to
@@ -46,6 +37,10 @@ public interface XPathHandler {
     /**
      * Get a Jaxen Navigator for this Language. May return <code>null</code> if
      * there is no Jaxen Navigation for this language.
+     *
+     * @deprecated Support for Jaxen will be removed come 7.0.0. This isn't used
+     *             anymore
      */
+    @Deprecated
     Navigator getNavigator();
 }

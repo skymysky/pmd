@@ -1,13 +1,35 @@
 ---
 title: Tools / Integrations
+tags: [userdocs, tools]
+
 permalink: pmd_userdocs_tools.html
 author: David Dixon-Peugh <dpeugh@users.sourceforge.net>
 ---
 
-* IDE plugins
-* [Continuous Integrations plugins](/pmd_userdocs_ci.html)
-* GUIs
+## Automated Code Review
 
+### Codacy
+
+[Codacy](https://www.codacy.com/) automates code reviews and monitors code quality on every commit and pull request.
+It gives visibility into the technical debt and it can track code style and security issues, code coverage, code duplication, cyclomatic complexity and enforce best practices.
+Codacy is static analysis without the hassle.
+
+With Codacy you have PMDJava analysis out-of-the-box, and it is free for open source projects.
+
+* Homepage: [https://www.codacy.com/](https://www.codacy.com/)
+* Source code: [https://github.com/codacy/codacy-pmdjava](https://github.com/codacy/codacy-pmdjava)
+* Maintainer: Codacy
+
+### Code Inspector
+
+[Code Inspector](https://www.code-inspector.com) automates code review, check your code quality and helps you manage your technical debt.
+It is integrated with GitHub, GitLab and Bitbucket. The platform also analyzes code directly in your IDE using its integration
+plugins for VS Code and IntelliJ, providing a consistent analysis along your development cycle (from the IDE to the CI/CD pipeline).
+
+Code Inspector uses PMD to check Java and Apex code.
+
+* Homepage: [https://www.code-inspector.com](https://www.code-inspector.com)
+* Documentation: [https://doc.code-inspector.com](https://doc.code-inspector.com)
 
 
 ## IDE Integrations
@@ -30,13 +52,6 @@ author: David Dixon-Peugh <dpeugh@users.sourceforge.net>
     </tr>
 
     <tr>
-        <td><a href="#codacy">Codacy</a></td>
-        <td></td>
-        <td><a class="externalLink" href="https://github.com/codacy/codacy-pmdjava">github: codacy/codacy-pmdjava</a></td>
-        <td>Codacy</td>
-    </tr>
-
-    <tr>
         <td><a href="#code-guide">CodeGuide</a></td>
         <td></td>
         <td>N/A</td>
@@ -48,6 +63,13 @@ author: David Dixon-Peugh <dpeugh@users.sourceforge.net>
         <td></td>
         <td><a href="https://github.com/pmd/pmd-eclipse-plugin">github: pmd/pmd-eclipse</a></td>
         <td>Philippe Herlin</td>
+    </tr>
+    
+    <tr>
+        <td>qa-Eclipse</td>
+        <td></td>
+        <td><a href="https://github.com/ChristianWulf/qa-eclipse-plugin">qa-Eclipse</a></td>
+        <td>Christian Wulf</td>       
     </tr>
 
     <tr>
@@ -157,38 +179,6 @@ being used by a getResourceAsStream() call to load it out of the PMD jar files.
 the [PMDExtension jar file](http://sourceforge.net/projects/pmd/files/pmd-bluej/pmd-bluej-1.0/)
 and place it in your `bluej/lib/extensions/` directory.
 
-
-### Codacy
-
-Although it is not an IDE, with [Codacy](https://www.codacy.com/) you have PMDJava analysis out-of-the-box,
-and it is free for open source projects.
-
-
-### Code Guide
-
-Here's how to set up PMD with Omnicore's CodeGuide:
-
-*   Download the PMD zip file from [here](http://sourceforge.net/projects/pmd/files/pmd/)
-*   Unpack the zip file to your local disk. I put it in /Applications/
-*   Add the following tool to CodeGuide (Tools->Configure Tools->New):
-    *   Name: PMD
-    *   Kind: Tool for directories
-    *   Executable: /Applications/pmd-bin-{{pmd.site.version}}/bin/run.sh
-    *   Arguments: pmd -d $DIRECTORY_PATH$ -f emacs $USER_ARGUMENTS$
-
-Now you can right click on a source directory, select the PMD tool and a dialog box will appear.
-Type in the name of a rule set (e.g. unusedcode). PMD is then executed on the directory you
-selected with the rule set you specified. Since CodeGuide understands the emacs syntax you can
-click on the file name and CodeGuide will jump to that file and line number.
-
-Note: I set this up on Mac OS X. It should work on other unix variations just the same.
-Of course you need to change the "Executable" setting above to where your PMD is installed.
-On Windows you need to use the pmd.bat file instead of pmd.sh.
-
-If you haven't heard of CodeGuide before, [check it out](http://www.omnicore.com/).
-It's a great IDE.
-
-
 ### Eclipse
 
 To install the PMD plugin for Eclipse:
@@ -265,11 +255,11 @@ Here's how to set it up as an "External Tool":
     *   Name: PMD
     *   Description: PMD, good for what ails you.
     *   Menu: Select the "Main menu", "Project views", "Editor menu", and "Search results" checkboxes.
-    *   Program: $JDKPath$\bin\java.exe
+    *   Program: `c:\pmd\bin\pmd.bat`
     *   For the next parameter you'll need to plug in the location of your PMD installation
         and the rulesets you want to use
     *   Parameters:
-        `-cp %CLASSPATH%;c:\pmd\lib\pmd-{{pmd.site.version}}.jar;c:\pmd\lib\asm-3.2.jar;c:\pmd\lib\jaxen-1.1.1.jar net.sourceforge.pmd.PMD "$FilePath$" ideaj unusedcode,imports "$Sourcepath$" $FileClass$.method $FileName$`
+        `-d "$FilePath$" -f ideaj -R rulesets/java/quickstart.xml -P sourcePath="$Sourcepath$" -P classAndMethodName=$FileClass$.method -P fileName=$FileName$`
 
 That's pretty much it. Now you can right click on a source directory and select PMD,
 it'll run recursively on the source files, and the results should

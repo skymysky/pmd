@@ -10,12 +10,14 @@ import java.lang.reflect.Method;
 import org.objectweb.asm.signature.SignatureReader;
 
 import net.sourceforge.pmd.dcd.ClassLoaderUtil;
+import net.sourceforge.pmd.dcd.DCD;
 import net.sourceforge.pmd.dcd.asm.TypeSignatureVisitor;
 
 /**
  * Represents a Class Method in a UsageGraph.
+ * @deprecated See {@link DCD}
  */
-@SuppressWarnings("PMD.OverrideBothEqualsAndHashcode")
+@Deprecated
 public class MethodNode extends MemberNode<MethodNode, Method> {
 
     private WeakReference<Method> methodReference;
@@ -57,22 +59,5 @@ public class MethodNode extends MemberNode<MethodNode, Method> {
             }
         }
         return cmp;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof MethodNode) {
-            MethodNode that = (MethodNode) obj;
-            return super.equals(that);
-        }
-        return false;
-    }
-
-    /* (non-Javadoc)
-     * @see net.sourceforge.pmd.dcd.graph.MemberNode#hashCode()
-     */
-    @Override
-    public int hashCode() {
-        return super.hashCode();
     }
 }

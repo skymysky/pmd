@@ -6,7 +6,6 @@ package net.sourceforge.pmd.util.viewer.gui;
 
 import java.awt.BorderLayout;
 import java.util.Vector;
-
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -71,7 +70,7 @@ public class EvaluationResultsPanel extends JPanel implements ViewerModelListene
         switch (e.getReason()) {
         case ViewerModelEvent.PATH_EXPRESSION_EVALUATED:
 
-            if (e.getSource() != this) {
+            if (!e.getSource().equals(this)) {
                 list.setListData(new Vector(model.getLastEvaluationResults()));
             }
 

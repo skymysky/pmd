@@ -8,17 +8,22 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import net.sourceforge.pmd.lang.java.ast.ASTCompilationUnit;
 import net.sourceforge.pmd.lang.java.ast.ASTImportDeclaration;
+import net.sourceforge.pmd.lang.java.ast.internal.ImportWrapper;
 import net.sourceforge.pmd.lang.java.rule.AbstractJavaRule;
-import net.sourceforge.pmd.lang.rule.ImportWrapper;
 
+@Deprecated
 public class DuplicateImportsRule extends AbstractJavaRule {
+    private static final Logger LOG = Logger.getLogger(DuplicateImportsRule.class.getName());
 
     private Set<ImportWrapper> singleTypeImports;
     private Set<ImportWrapper> importOnDemandImports;
 
+    @Override
     public Object visit(ASTCompilationUnit node, Object data) {
         singleTypeImports = new HashSet<>();
         importOnDemandImports = new HashSet<>();
@@ -29,13 +34,12 @@ public class DuplicateImportsRule extends AbstractJavaRule {
         // import java.io.File;
         for (ImportWrapper thisImportOnDemand : importOnDemandImports) {
             for (ImportWrapper thisSingleTypeImport : singleTypeImports) {
-                String singleTypeFullName = thisSingleTypeImport.getName(); // java.io.File
+                String singleTypeFullName = thisSingleTypeImport.getFullName(); // java.io.File
 
-                int lastDot = singleTypeFullName.lastIndexOf('.');
-                String singleTypePkg = singleTypeFullName.substring(0, lastDot); // java.io
-                String singleTypeName = singleTypeFullName.substring(lastDot + 1); // File
+                String singleTypePkg = thisSingleTypeImport.getPackageName(); // java.io
+                String singleTypeName = thisSingleTypeImport.getName(); // File
 
-                if (thisImportOnDemand.getName().equals(singleTypePkg)
+                if (thisImportOnDemand.getFullName().equals(singleTypePkg)
                         && !isDisambiguationImport(node, singleTypePkg, singleTypeName)) {
                     addViolation(data, thisSingleTypeImport.getNode(), singleTypeFullName);
                 }
@@ -49,7 +53,7 @@ public class DuplicateImportsRule extends AbstractJavaRule {
     /**
      * Check whether this seemingly duplicate import is actually a
      * disambiguation import.
-     * 
+     *
      * Example: import java.awt.*; import java.util.*; import java.util.List;
      * //Needed because java.awt.List exists
      */
@@ -57,21 +61,26 @@ public class DuplicateImportsRule extends AbstractJavaRule {
         // Loop over .* imports
         for (ImportWrapper thisImportOnDemand : importOnDemandImports) {
             // Skip same package
-            if (!thisImportOnDemand.getName().equals(singleTypePkg)) {
+            if (!thisImportOnDemand.getFullName().equals(singleTypePkg)) {
                 if (!thisImportOnDemand.isStaticOnDemand()) {
-                    String fullyQualifiedClassName = thisImportOnDemand.getName() + "." + singleTypeName;
+                    String fullyQualifiedClassName = thisImportOnDemand.getFullName() + "." + singleTypeName;
                     if (node.getClassTypeResolver().classNameExists(fullyQualifiedClassName)) {
                         // Class exists in another imported package
                         return true;
                     }
                 } else {
-                    Class<?> importClass = node.getClassTypeResolver().loadClass(thisImportOnDemand.getName());
+                    Class<?> importClass = node.getClassTypeResolver().loadClassOrNull(thisImportOnDemand.getFullName());
                     if (importClass != null) {
-                        for (Method m : importClass.getMethods()) {
-                            if (Modifier.isStatic(m.getModifiers()) && m.getName().equals(singleTypeName)) {
-                                // static method in another imported class
-                                return true;
+                        try {
+                            for (Method m : importClass.getMethods()) {
+                                if (Modifier.isStatic(m.getModifiers()) && m.getName().equals(singleTypeName)) {
+                                    // static method in another imported class
+                                    return true;
+                                }
                             }
+                        } catch (LinkageError e) {
+                            // This is an incomplete classpath, report the missing class
+                            LOG.log(Level.FINE, "Possible incomplete auxclasspath: Error while processing methods", e);
                         }
                     }
                 }
@@ -79,28 +88,25 @@ public class DuplicateImportsRule extends AbstractJavaRule {
         }
 
         String fullyQualifiedClassName = "java.lang." + singleTypeName;
-        if (node.getClassTypeResolver().classNameExists(fullyQualifiedClassName)) {
-            return true; // Class exists in another imported package
-        }
-
-        return false; // This really is a duplicate import
+        // Class might exist in another imported package
+        return node.getClassTypeResolver().classNameExists(fullyQualifiedClassName);
     }
 
+    @Override
     public Object visit(ASTImportDeclaration node, Object data) {
-        ImportWrapper wrapper = new ImportWrapper(node.getImportedName(), node.getImportedName(),
-                node.getImportedNameNode(), node.isStatic() && node.isImportOnDemand());
+        ImportWrapper wrapper = new ImportWrapper(node);
 
         // blahhhh... this really wants to be ASTImportDeclaration to be
         // polymorphic...
         if (node.isImportOnDemand()) {
             if (importOnDemandImports.contains(wrapper)) {
-                addViolation(data, node.getImportedNameNode(), node.getImportedNameNode().getImage());
+                addViolation(data, node, node.getImportedName());
             } else {
                 importOnDemandImports.add(wrapper);
             }
         } else {
             if (singleTypeImports.contains(wrapper)) {
-                addViolation(data, node.getImportedNameNode(), node.getImportedNameNode().getImage());
+                addViolation(data, node, node.getImportedName());
             } else {
                 singleTypeImports.add(wrapper);
             }

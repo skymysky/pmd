@@ -5,12 +5,18 @@
 package net.sourceforge.pmd.lang.java.symboltable;
 
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
+
+import net.sourceforge.pmd.annotation.InternalApi;
+import net.sourceforge.pmd.lang.java.ast.TypeNode;
 
 /**
  * Just stores a type image and a actual type. And makes it easy to compare
  * these.
  */
+@Deprecated
+@InternalApi
 public class SimpleTypedNameDeclaration implements TypedNameDeclaration {
 
     private final String typeImage;
@@ -34,7 +40,7 @@ public class SimpleTypedNameDeclaration implements TypedNameDeclaration {
 
     /**
      * Creates a new {@link SimpleTypedNameDeclaration} with the given type
-     * 
+     *
      * @param typeImage
      *            the type image
      * @param type
@@ -61,6 +67,11 @@ public class SimpleTypedNameDeclaration implements TypedNameDeclaration {
         } else {
             this.next.addNext(next);
         }
+    }
+
+    @Override
+    public TypeNode getTypeNode() {
+        return null;
     }
 
     @Override
@@ -113,6 +124,7 @@ public class SimpleTypedNameDeclaration implements TypedNameDeclaration {
         return false;
     }
 
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     private boolean internalEquals(Object obj) {
         if (this == obj) {
             return true;
@@ -150,8 +162,8 @@ public class SimpleTypedNameDeclaration implements TypedNameDeclaration {
         } else if (!typeImage.equals(other.typeImage)) {
             // consider auto-boxing
             if (other.typeImage != null) {
-                String lcType = typeImage.toLowerCase();
-                String otherLcType = other.typeImage.toLowerCase();
+                String lcType = typeImage.toLowerCase(Locale.ROOT);
+                String otherLcType = other.typeImage.toLowerCase(Locale.ROOT);
                 if (primitiveTypes.contains(lcType) && primitiveTypes.contains(otherLcType)) {
                     if (lcType.equals(otherLcType)) {
                         return true;

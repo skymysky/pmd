@@ -4,10 +4,15 @@
 
 package net.sourceforge.pmd.lang.jsp.ast;
 
+import net.sourceforge.pmd.lang.ast.ParseException;
+
 /**
  * @author Pieter_Van_Raemdonck
  * @since Created on 11-jan-2006
+ *
+ * @deprecated for removal with PMD 7.0.0. Use {@link ParseException} instead.
  */
+@Deprecated
 public class StartAndEndTagMismatchException extends SyntaxErrorException {
 
     private static final long serialVersionUID = 5434485938487458692L;
@@ -73,7 +78,7 @@ public class StartAndEndTagMismatchException extends SyntaxErrorException {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Throwable#getMessage()
      */
     @Override

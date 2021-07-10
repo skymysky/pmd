@@ -17,7 +17,7 @@ package net.sourceforge.pmd.lang.vm.ast;
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
- * under the License.    
+ * under the License.
  */
 
 import java.io.PrintWriter;
@@ -25,12 +25,15 @@ import java.io.Writer;
 
 import org.apache.commons.lang3.text.StrBuilder;
 
-import net.sourceforge.pmd.lang.ast.AbstractNode;
+import net.sourceforge.pmd.annotation.InternalApi;
+import net.sourceforge.pmd.lang.ast.impl.javacc.AbstractJjtreeNode;
 
 /**
  *
  */
-public class AbstractVmNode extends AbstractNode implements VmNode {
+@InternalApi
+@Deprecated
+public class AbstractVmNode extends AbstractJjtreeNode<VmNode> implements VmNode {
 
     /** */
     // TODO - It seems that this field is only valid when parsing, and should
@@ -93,9 +96,8 @@ public class AbstractVmNode extends AbstractNode implements VmNode {
         endColumn = parser.token.endColumn;
     }
 
-    /**
-     * @param t
-     */
+    @InternalApi
+    @Deprecated
     public void setFirstToken(final Token t) {
         this.first = t;
     }
@@ -108,17 +110,23 @@ public class AbstractVmNode extends AbstractNode implements VmNode {
         return last;
     }
 
+    @Override
     public Object jjtAccept(final VmParserVisitor visitor, final Object data) {
         return visitor.visit(this, data);
     }
 
+    @Override
     public Object childrenAccept(final VmParserVisitor visitor, final Object data) {
-        if (children != null) {
-            for (int i = 0; i < children.length; ++i) {
-                ((VmNode) children[i]).jjtAccept(visitor, data);
-            }
+        for (VmNode c : children()) {
+            c.jjtAccept(visitor, data);
         }
         return data;
+    }
+
+
+    @Override
+    public String getXPathNodeName() {
+        return VmParserTreeConstants.jjtNodeName[id];
     }
 
     /*
@@ -128,14 +136,14 @@ public class AbstractVmNode extends AbstractNode implements VmNode {
      * otherwise overriding toString() is probably all you need to do.
      */
 
-    public String toString() {
-        return VmParserTreeConstants.jjtNodeName[id];
-    }
+
 
     /**
      * @param prefix
      * @return String representation of this node.
+     * @deprecated will be removed with PMD 7. Was only needed for {@link #dump(String, boolean, Writer)}.
      */
+    @Deprecated
     public String toString(final String prefix) {
         return prefix + toString();
     }
@@ -143,9 +151,11 @@ public class AbstractVmNode extends AbstractNode implements VmNode {
     /**
      * Override this method if you want to customize how the node dumps out its
      * children.
-     * 
+     *
      * @param prefix
+     * @deprecated This method will be removed with PMD 7. The rule designer is a better way to inspect nodes.
      */
+    @Deprecated
     public void dump(final String prefix, final boolean recurse, final Writer writer) {
         final PrintWriter printWriter = writer instanceof PrintWriter ? (PrintWriter) writer : new PrintWriter(writer);
         printWriter.println(toString(prefix));

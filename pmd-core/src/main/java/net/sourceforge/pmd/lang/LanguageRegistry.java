@@ -12,28 +12,38 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * Created by christoferdutz on 20.09.14.
+ * Provides access to the registered PMD languages. These are found
+ * from the classpath of the {@link ClassLoader} of this class.
  */
 public final class LanguageRegistry {
 
-    private static LanguageRegistry instance = new LanguageRegistry();
+    private static final LanguageRegistry INSTANCE = new LanguageRegistry();
 
-    private Map<String, Language> languages;
+    private final Map<String, Language> languages;
 
     private LanguageRegistry() {
         List<Language> languagesList = new ArrayList<>();
-        ServiceLoader<Language> languageLoader = ServiceLoader.load(Language.class);
+        // Use current class' classloader instead of the threads context classloader, see https://github.com/pmd/pmd/issues/1377
+        ServiceLoader<Language> languageLoader = ServiceLoader.load(Language.class, getClass().getClassLoader());
         Iterator<Language> iterator = languageLoader.iterator();
-        while (iterator.hasNext()) {
+
+        while (true) {
+            // this loop is weird, but both hasNext and next may throw ServiceConfigurationError,
+            // it's more robust that way
             try {
-                Language language = iterator.next();
-                languagesList.add(language);
-            } catch (UnsupportedClassVersionError e) {
+                if (iterator.hasNext()) {
+                    Language language = iterator.next();
+                    languagesList.add(language);
+                } else {
+                    break;
+                }
+            } catch (UnsupportedClassVersionError | ServiceConfigurationError e) {
                 // Some languages require java8 and are therefore only available
                 // if java8 or later is used as runtime.
                 System.err.println("Ignoring language for PMD: " + e.toString());
@@ -56,18 +66,59 @@ public final class LanguageRegistry {
         }
     }
 
+    /**
+     * @deprecated Use the static methods instead, will be made private
+     */
+    @Deprecated
     public static LanguageRegistry getInstance() {
-        return instance;
+        return INSTANCE;
     }
 
+    /**
+     * Returns a collection of all the known languages. The ordering of this
+     * collection is undefined.
+     */
     public static Collection<Language> getLanguages() {
-        return getInstance().languages.values();
+        // Filter out languages, that are not fully supported by PMD yet.
+        // Those languages should not have a LanguageModule then, but they have it.
+        // TODO This is unnecessary, if the incomplete language modules have been removed.
+        List<Language> languages = new ArrayList<>();
+        for (Language language : getInstance().languages.values()) {
+            LanguageVersionHandler languageVersionHandler = language.getDefaultVersion().getLanguageVersionHandler();
+            boolean pmdSupported = false;
+
+            if (languageVersionHandler != null) {
+                ParserOptions defaultParserOptions = languageVersionHandler.getDefaultParserOptions();
+                Parser parser = languageVersionHandler.getParser(defaultParserOptions);
+                pmdSupported = parser.canParse();
+            }
+
+            if (pmdSupported) {
+                languages.add(language);
+            }
+        }
+        return languages;
     }
 
+    /**
+     * Returns a language from its {@linkplain Language#getName() full name}
+     * (eg {@code "Java"}). This is case sensitive.
+     *
+     * @param languageName Language name
+     *
+     * @return A language, or null if the name is unknown
+     */
     public static Language getLanguage(String languageName) {
         return getInstance().languages.get(languageName);
     }
 
+    /**
+     * Returns a "default language" known to the service loader. This
+     * is the Java language if available, otherwise an arbitrary one.
+     * If no languages are loaded, returns null.
+     *
+     * @return A language, or null if the name is unknown
+     */
     public static Language getDefaultLanguage() {
         Language defaultLanguage = getLanguage("Java");
         if (defaultLanguage == null) {
@@ -79,6 +130,14 @@ public final class LanguageRegistry {
         return defaultLanguage;
     }
 
+    /**
+     * Returns a language from its {@linkplain Language#getTerseName() terse name}
+     * (eg {@code "java"}). This is case sensitive.
+     *
+     * @param terseName Language terse name
+     *
+     * @return A language, or null if the name is unknown
+     */
     public static Language findLanguageByTerseName(String terseName) {
         for (Language language : getInstance().languages.values()) {
             if (language.getTerseName().equals(terseName)) {
@@ -88,6 +147,10 @@ public final class LanguageRegistry {
         return null;
     }
 
+    /**
+     * @deprecated This is not useful, will be removed with 7.0.0
+     */
+    @Deprecated
     public static LanguageVersion findLanguageVersionByTerseName(String terseNameAndVersion) {
         String version;
         String terseName;
@@ -109,16 +172,25 @@ public final class LanguageRegistry {
         return null;
     }
 
-    public static List<Language> findByExtension(String extension) {
+    /**
+     * Returns all languages that support the given extension.
+     *
+     * @param extensionWithoutDot A file extension (without '.' prefix)
+     */
+    public static List<Language> findByExtension(String extensionWithoutDot) {
         List<Language> languages = new ArrayList<>();
         for (Language language : getInstance().languages.values()) {
-            if (language.hasExtension(extension)) {
+            if (language.hasExtension(extensionWithoutDot)) {
                 languages.add(language);
             }
         }
         return languages;
     }
 
+    /**
+     * @deprecated This is not useful, will be removed with 7.0.0
+     */
+    @Deprecated
     public static List<LanguageVersion> findAllVersions() {
         List<LanguageVersion> versions = new ArrayList<>();
         for (Language language : getLanguages()) {
@@ -131,17 +203,18 @@ public final class LanguageRegistry {
      * A utility method to find the Languages which have Rule support.
      *
      * @return A List of Languages with Rule support.
+     *
+     * @deprecated This method will be removed with PMD 7.0.0. Use {@link #getLanguages()} instead.
      */
+    @Deprecated
     public static List<Language> findWithRuleSupport() {
-        List<Language> languages = new ArrayList<>();
-        for (Language language : getInstance().languages.values()) {
-            if (language.getRuleChainVisitorClass() != null) {
-                languages.add(language);
-            }
-        }
-        return languages;
+        return new ArrayList<>(getLanguages());
     }
 
+    /**
+     * @deprecated This is too specific, will be removed with 7.0.0
+     */
+    @Deprecated
     public static String commaSeparatedTerseNamesForLanguage(List<Language> languages) {
         StringBuilder builder = new StringBuilder();
         for (Language language : languages) {
@@ -153,6 +226,10 @@ public final class LanguageRegistry {
         return builder.toString();
     }
 
+    /**
+     * @deprecated This is too specific, will be removed with 7.0.0
+     */
+    @Deprecated
     public static String commaSeparatedTerseNamesForLanguageVersion(List<LanguageVersion> languageVersions) {
         if (languageVersions == null || languageVersions.isEmpty()) {
             return "";

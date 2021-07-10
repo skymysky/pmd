@@ -6,37 +6,36 @@ package net.sourceforge.pmd.cpd;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.Reader;
 import java.io.StringReader;
 import java.util.Properties;
 
-import org.apache.commons.io.IOUtils;
-
 import net.sourceforge.pmd.PMD;
-import net.sourceforge.pmd.lang.LanguageRegistry;
-import net.sourceforge.pmd.lang.LanguageVersionHandler;
+import net.sourceforge.pmd.cpd.internal.JavaCCTokenizer;
+import net.sourceforge.pmd.cpd.token.JavaCCTokenFilter;
+import net.sourceforge.pmd.cpd.token.TokenFilter;
 import net.sourceforge.pmd.lang.TokenManager;
-import net.sourceforge.pmd.lang.ast.TokenMgrError;
-import net.sourceforge.pmd.lang.cpp.CppLanguageModule;
-import net.sourceforge.pmd.lang.cpp.ast.Token;
+import net.sourceforge.pmd.lang.ast.GenericToken;
+import net.sourceforge.pmd.lang.cpp.CppTokenManager;
+import net.sourceforge.pmd.lang.cpp.ast.CppParserConstants;
 import net.sourceforge.pmd.util.IOUtil;
 
 /**
  * The C++ tokenizer.
  */
-public class CPPTokenizer implements Tokenizer {
+public class CPPTokenizer extends JavaCCTokenizer {
 
     private boolean skipBlocks = true;
     private String skipBlocksStart;
     private String skipBlocksEnd;
+    private boolean ignoreLiteralSequences = false;
 
     /**
      * Sets the possible options for the C++ tokenizer.
-     * 
-     * @param properties
-     *            the properties
+     *
+     * @param properties the properties
      * @see #OPTION_SKIP_BLOCKS
      * @see #OPTION_SKIP_BLOCKS_PATTERN
+     * @see #OPTION_IGNORE_LITERAL_SEQUENCES
      */
     public void setProperties(Properties properties) {
         skipBlocks = Boolean.parseBoolean(properties.getProperty(OPTION_SKIP_BLOCKS, Boolean.TRUE.toString()));
@@ -50,38 +49,8 @@ public class CPPTokenizer implements Tokenizer {
                 skipBlocksEnd = split[1];
             }
         }
-    }
-
-    @Override
-    public void tokenize(SourceCode sourceCode, Tokens tokenEntries) {
-        StringBuilder buffer = sourceCode.getCodeBuffer();
-        Reader reader = null;
-        try {
-            LanguageVersionHandler languageVersionHandler = LanguageRegistry.getLanguage(CppLanguageModule.NAME)
-                    .getDefaultVersion().getLanguageVersionHandler();
-            reader = new StringReader(maybeSkipBlocks(buffer.toString()));
-            reader = IOUtil.skipBOM(reader);
-            TokenManager tokenManager = languageVersionHandler
-                    .getParser(languageVersionHandler.getDefaultParserOptions())
-                    .getTokenManager(sourceCode.getFileName(), reader);
-            Token currentToken = (Token) tokenManager.getNextToken();
-            while (currentToken.image.length() > 0) {
-                tokenEntries.add(new TokenEntry(currentToken.image, sourceCode.getFileName(), currentToken.beginLine));
-                currentToken = (Token) tokenManager.getNextToken();
-            }
-            tokenEntries.add(TokenEntry.getEOF());
-            System.err.println("Added " + sourceCode.getFileName());
-        } catch (TokenMgrError err) {
-            err.printStackTrace();
-            System.err.println("Skipping " + sourceCode.getFileName() + " due to parse error");
-            tokenEntries.add(TokenEntry.getEOF());
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.err.println("Skipping " + sourceCode.getFileName() + " due to parse error");
-            tokenEntries.add(TokenEntry.getEOF());
-        } finally {
-            IOUtils.closeQuietly(reader);
-        }
+        ignoreLiteralSequences = Boolean.parseBoolean(properties.getProperty(OPTION_IGNORE_LITERAL_SEQUENCES,
+                Boolean.FALSE.toString()));
     }
 
     private String maybeSkipBlocks(String test) throws IOException {
@@ -89,22 +58,114 @@ public class CPPTokenizer implements Tokenizer {
             return test;
         }
 
-        BufferedReader reader = new BufferedReader(new StringReader(test));
-        StringBuilder filtered = new StringBuilder(test.length());
-        String line;
-        boolean skip = false;
-        while ((line = reader.readLine()) != null) {
-            if (skipBlocksStart.equalsIgnoreCase(line.trim())) {
-                skip = true;
-            } else if (skip && skipBlocksEnd.equalsIgnoreCase(line.trim())) {
-                skip = false;
+        try (BufferedReader reader = new BufferedReader(new StringReader(test))) {
+            StringBuilder filtered = new StringBuilder(test.length());
+            String line;
+            boolean skip = false;
+            while ((line = reader.readLine()) != null) {
+                if (skipBlocksStart.equalsIgnoreCase(line.trim())) {
+                    skip = true;
+                } else if (skip && skipBlocksEnd.equalsIgnoreCase(line.trim())) {
+                    skip = false;
+                }
+                if (!skip) {
+                    filtered.append(line);
+                }
+                // always add a new line to keep the line-numbering
+                filtered.append(PMD.EOL);
             }
-            if (!skip) {
-                filtered.append(line);
-            }
-            // always add a new line to keep the line-numbering
-            filtered.append(PMD.EOL); 
+            return filtered.toString();
         }
-        return filtered.toString();
+    }
+
+    @Override
+    protected TokenManager getLexerForSource(SourceCode sourceCode) {
+        try {
+            StringBuilder buffer = sourceCode.getCodeBuffer();
+            return new CppTokenManager(IOUtil.skipBOM(new StringReader(maybeSkipBlocks(buffer.toString()))));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    protected TokenFilter getTokenFilter(final TokenManager tokenManager) {
+        return new CppTokenFilter(tokenManager, ignoreLiteralSequences);
+    }
+
+    private static class CppTokenFilter extends JavaCCTokenFilter {
+        private final boolean ignoreLiteralSequences;
+        private GenericToken discardingLiteralsUntil = null;
+        private boolean discardCurrent = false;
+
+        CppTokenFilter(final TokenManager tokenManager, final boolean ignoreLiteralSequences) {
+            super(tokenManager);
+            this.ignoreLiteralSequences = ignoreLiteralSequences;
+        }
+
+        @Override
+        protected void analyzeTokens(final GenericToken currentToken, final Iterable<GenericToken> remainingTokens) {
+            discardCurrent = false;
+            skipLiteralSequences(currentToken, remainingTokens);
+        }
+
+        private void skipLiteralSequences(final GenericToken currentToken, final Iterable<GenericToken> remainingTokens) {
+            if (ignoreLiteralSequences) {
+                final int kind = currentToken.getKind();
+                if (isDiscardingLiterals()) {
+                    if (currentToken == discardingLiteralsUntil) { // NOPMD - intentional check for reference equality
+                        discardingLiteralsUntil = null;
+                        discardCurrent = true;
+                    }
+                } else if (kind == CppParserConstants.LCURLYBRACE) {
+                    final GenericToken finalToken = findEndOfSequenceOfLiterals(remainingTokens);
+                    discardingLiteralsUntil = finalToken;
+                }
+            }
+        }
+
+        private static GenericToken findEndOfSequenceOfLiterals(final Iterable<GenericToken> remainingTokens) {
+            boolean seenLiteral = false;
+            int braceCount = 0;
+            for (final GenericToken token : remainingTokens) {
+                switch (token.getKind()) {
+                case CppParserConstants.BINARY_INT_LITERAL:
+                case CppParserConstants.DECIMAL_INT_LITERAL:
+                case CppParserConstants.FLOAT_LITERAL:
+                case CppParserConstants.HEXADECIMAL_INT_LITERAL:
+                case CppParserConstants.OCTAL_INT_LITERAL:
+                case CppParserConstants.ZERO:
+                    seenLiteral = true;
+                    break; // can be skipped; continue to the next token
+                case CppParserConstants.COMMA:
+                    break; // can be skipped; continue to the next token
+                case CppParserConstants.LCURLYBRACE:
+                    braceCount++;
+                    break; // curly braces are allowed, as long as they're balanced
+                case CppParserConstants.RCURLYBRACE:
+                    braceCount--;
+                    if (braceCount < 0) {
+                        // end of the list; skip all contents
+                        return seenLiteral ? token : null;
+                    } else {
+                        // curly braces are not yet balanced; continue to the next token
+                        break;
+                    }
+                default:
+                    // some other token than the expected ones; this is not a sequence of literals
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        private boolean isDiscardingLiterals() {
+            return discardingLiteralsUntil != null;
+        }
+
+        @Override
+        protected boolean isLanguageSpecificDiscarding() {
+            return isDiscardingLiterals() || discardCurrent;
+        }
     }
 }

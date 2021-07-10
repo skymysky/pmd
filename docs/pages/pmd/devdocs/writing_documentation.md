@@ -1,5 +1,6 @@
 ---
 title: Writing documentation
+tags: [devdocs]
 last_update: August 2017
 permalink: pmd_devdocs_writing_documentation.html
 keywords: documentation, jekyll, markdown
@@ -17,12 +18,73 @@ The pages are in general in [Github Flavored Markdown](https://kramdown.gettalon
 
 ## Structure
 
-All documentation is stored in the folder `docs/`. This is the folder, that github and the travis-ci scripts
-use to render the site.
+The documentation sources can be found in two places based on how they are generated:
+- the ones that are manually written (like the one you are reading);
+- and the ones that are generated automatically from the category files. All the rule documentation
+pages are generated that way.
 
-New pages are stored in the different subfolders under `pages`. The folder structure resembles the sidebar structure.
+### Handwritten documentation
+
+All handwritten documentation is stored in the subfolders under `docs/pages`. The folder structure resembles the sidebar structure.
 Since all pages use a simple *permalink*, in the rendered html pages, all pages are flattened in one directory.
 This makes it easy to view the documentation also offline.
+
+### Rule documentation
+
+The categories for a language `%lang%` are located in
+`pmd-%lang%/src/main/resources/category/%lang% `. So for Java the categories
+can be found under [pmd-java/src/main/resources/category/java](https://github.com/pmd/pmd/tree/master/pmd-java/src/main/resources/category/java).
+The XML category files in this directory are transformed during build into markdown pages
+describing the rules they contain. These pages are placed under `docs/` like the handwritten
+documentation, and are then rendered with Jekyll like the rest of them. The rule documentation
+generator is the separate submodule `pmd-doc`.
+
+Modifying the documentation of a rule should thus not be done on the markdown page,
+but directly on the XML `rule` tag corresponding to the rule, in the relevant
+category file.
+
+The XML documentation of rules can contain GitHub flavoured markdown.
+Just wrap the markdown inside CDATA section in the xml. CDATA sections preserve
+all formatting inside the delimiters, and allow to write code samples without
+ escaping special xml characters. For example:
+```
+<rule ...>
+ <description>
+ <![CDATA[
+   Full description, can contain markup
+
+   And paragraphs
+ ]]>
+ </description>
+ ...
+</rule>
+```
+
+## Custom Liquid Tags
+
+We have some additional custom liquid tags that help in writing the documentation.
+
+Here's a short overview:
+
+| Liquid | Rendered as |
+|:-------|:------------|
+| `{% raw %}{% rule "java/codestyle/LinguisticNaming" %}{% endraw %}`               | {% rule "java/codestyle/LinguisticNaming" %} |
+| `{% raw %}{% jdoc core::Rule %}{% endraw %}`                                      | {% jdoc core::Rule %} |
+| `{% raw %}{% jdoc !q!core::Rule %}{% endraw %}`                                   | {% jdoc !q!core::Rule %} |
+| `{% raw %}{% jdoc core::Rule#setName(java.lang.String) %}{% endraw %}`            | {% jdoc core::Rule#setName(java.lang.String) %} |
+| `{% raw %}{% jdoc !c!core::Rule#setName(java.lang.String) %}{% endraw %}`         | {% jdoc !c!core::Rule#setName(java.lang.String) %} |
+| `{% raw %}{% jdoc !a!core::Rule#setName(java.lang.String) %}{% endraw %}`         | {% jdoc !a!core::Rule#setName(java.lang.String) %} |
+| `{% raw %}{% jdoc !ac!core::Rule#setName(java.lang.String) %}{% endraw %}`        | {% jdoc !ac!core::Rule#setName(java.lang.String) %} |
+| `{% raw %}{% jdoc core::properties.PropertyDescriptor %}{% endraw %}`             | {% jdoc core::properties.PropertyDescriptor %} |
+| `{% raw %}{% jdoc_nspace :jast java::lang.java.ast %}{% jdoc jast::ASTAnyTypeDeclaration %}{% endraw %}`       | {% jdoc_nspace :jast java::lang.java.ast %}{% jdoc jast::ASTAnyTypeDeclaration %} |
+| `{% raw %}{% jdoc_nspace :jast java::lang.java.ast %}{% jdoc_package :jast %}{% endraw %}`                     | {% jdoc_nspace :jast java::lang.java.ast %}{% jdoc_package :jast %} |
+| `{% raw %}{% jdoc_nspace :PrD core::properties.PropertyDescriptor %}{% jdoc !ac!:PrD#uiOrder() %}{% endraw %}` | {% jdoc_nspace :PrD core::properties.PropertyDescriptor %}{% jdoc !ac!:PrD#uiOrder() %} |
+| `{% raw %}{% jdoc_old core::Rule %}{% endraw %}`                                  | {% jdoc_old core::Rule %}
+
+For the javadoc tags, the standard PMD maven modules are already defined as namespaces, e.g. `core`, `java`, `apex`, ....
+
+For the implementation of these tags, see the [_plugins](https://github.com/pmd/pmd/tree/master/docs/_plugins) folder.
+
 
 ## Building
 
@@ -141,3 +203,8 @@ public class Foo {
     public void bar() { System.out.println("x"); }
 }
 ```
+
+## Checking for dead links
+
+`mvn verify -pl pmd-doc`. This only checks links within the site. HTTP links can be checked
+by specifying `-Dpmd.doc.checkExternalLinks=true` on the command line.

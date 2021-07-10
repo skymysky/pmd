@@ -5,6 +5,7 @@
 package net.sourceforge.pmd.lang.java.dfa;
 
 import net.sourceforge.pmd.lang.DataFlowHandler;
+import net.sourceforge.pmd.lang.dfa.DataFlowNode;
 import net.sourceforge.pmd.lang.java.ast.ASTCompilationUnit;
 import net.sourceforge.pmd.lang.java.ast.ASTConstructorDeclaration;
 import net.sourceforge.pmd.lang.java.ast.ASTMethodDeclaration;
@@ -15,7 +16,10 @@ import net.sourceforge.pmd.lang.java.ast.JavaParserVisitorAdapter;
  * constructors.
  *
  * @author raik
+ *
+ * @deprecated See {@link DataFlowNode}
  */
+@Deprecated
 public class DataFlowFacade extends JavaParserVisitorAdapter {
 
     private StatementAndBraceFinder sbf;
@@ -27,12 +31,14 @@ public class DataFlowFacade extends JavaParserVisitorAdapter {
         node.jjtAccept(this, null);
     }
 
+    @Override
     public Object visit(ASTMethodDeclaration node, Object data) {
         sbf.buildDataFlowFor(node);
         vav.compute(node);
         return data;
     }
 
+    @Override
     public Object visit(ASTConstructorDeclaration node, Object data) {
         sbf.buildDataFlowFor(node);
         vav.compute(node);

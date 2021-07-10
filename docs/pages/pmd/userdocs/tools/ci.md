@@ -1,5 +1,6 @@
 ---
 title: Continuous Integrations plugins
+tags: [userdocs, tools]
 permalink: pmd_userdocs_tools_ci.html
 author: Romain PELISSE <belaran@gmail.com>
 ---
@@ -18,7 +19,7 @@ Please check the plugin homepage for more info.
 
 ## Continuum
 
-Continous does not have a plugin for PMD per see, but can failed the build according to the
+Continuum does not have a plugin for PMD per see, but can failed the build according to the
 result of the PMD maven plugin.
 
 

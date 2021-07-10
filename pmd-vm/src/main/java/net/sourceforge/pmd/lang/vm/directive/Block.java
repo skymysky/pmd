@@ -17,7 +17,7 @@ package net.sourceforge.pmd.lang.vm.directive;
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
- * under the License.    
+ * under the License.
  */
 
 /**
@@ -29,13 +29,16 @@ package net.sourceforge.pmd.lang.vm.directive;
  * @author <a href="mailto:wyla@removethis.sci.fi">Jarkko Viinamaki</a>
  * @since 1.7
  * @version $Id: Block.java 686842 2008-08-18 18:29:31Z nbubna $
+ * @deprecated for removal in PMD 7.0.0
  */
+@Deprecated
 public abstract class Block extends Directive {
     protected String key;
 
     /**
      * Return type of this directive.
      */
+    @Override
     public int getType() {
         return BLOCK;
     }

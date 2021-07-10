@@ -10,18 +10,18 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import net.sourceforge.pmd.lang.java.ast.JavaQualifiedName;
 import net.sourceforge.pmd.lang.java.multifile.signature.JavaFieldSigMask;
 import net.sourceforge.pmd.lang.java.multifile.signature.JavaFieldSignature;
 import net.sourceforge.pmd.lang.java.multifile.signature.JavaOperationSigMask;
 import net.sourceforge.pmd.lang.java.multifile.signature.JavaOperationSignature;
+import net.sourceforge.pmd.lang.java.qname.JavaTypeQualifiedName;
 
 /**
  * Statistics about a class, enum, interface, or annotation. Stores information about the contained members and their
  * signatures, and memoizes the results of the class metrics computed on the corresponding node.
  *
  * <p>This class does not provide methods to operate directly on its nested classes, but only on itself. To operate on a
- * nested class, retrieve the correct ClassStats with {@link PackageStats#getClassStats(JavaQualifiedName, boolean)}
+ * nested class, retrieve the correct ClassStats with {@link PackageStats#getClassStats(JavaTypeQualifiedName, boolean)}
  * then use the methods of ClassStats. Note that at this level, entities of the data structure do not manipulate
  * QualifiedNames anymore, only Strings.
  *
@@ -98,9 +98,9 @@ final class ClassStats implements ClassMirror {
     @Override
     public boolean hasMatchingOpSig(String name, JavaOperationSigMask mask) {
         // Indexing on signatures optimises this type of request
-        for (JavaOperationSignature sig : operations.keySet()) {
-            if (mask.covers(sig)) {
-                if (operations.get(sig).contains(name)) {
+        for (Entry<JavaOperationSignature, Set<String>> entry : operations.entrySet()) {
+            if (mask.covers(entry.getKey())) {
+                if (entry.getValue().contains(name)) {
                     return true;
                 }
             }
@@ -111,9 +111,9 @@ final class ClassStats implements ClassMirror {
 
     @Override
     public boolean hasMatchingFieldSig(String name, JavaFieldSigMask mask) {
-        for (JavaFieldSignature sig : fields.keySet()) {
-            if (mask.covers(sig)) {
-                if (fields.get(sig).contains(name)) {
+        for (Entry<JavaFieldSignature, Set<String>> entry : fields.entrySet()) {
+            if (mask.covers(entry.getKey())) {
+                if (entry.getValue().contains(name)) {
                     return true;
                 }
             }

@@ -20,19 +20,21 @@ import net.sourceforge.pmd.lang.vm.directive.Directive;
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
- * under the License.    
+ * under the License.
  */
 
 /**
  * Convenient wrapper for LogChute functions. This implements the RuntimeLogger
  * methods (and then some). It is hoped that use of this will fully replace use
  * of the RuntimeLogger.
- * 
+ *
  * @author <a href="mailto:nbubna@apache.org">Nathan Bubna</a>
  * @version $Id: Log.java 724825 2008-12-09 18:56:06Z nbubna $
  * @since 1.5
+ * @deprecated for removal with PMD 7.0.0
  */
-public class LogUtil {
+@Deprecated
+public final class LogUtil {
     private LogUtil() { }
 
     /**
@@ -40,7 +42,7 @@ public class LogUtil {
      * column of the given Directive. We use this routine to provide a cosistent
      * format for displaying file errors.
      */
-    public static final String formatFileString(final Directive directive) {
+    public static String formatFileString(final Directive directive) {
         return formatFileString(directive.getTemplateName(), directive.getLine(), directive.getColumn());
     }
 
@@ -49,7 +51,7 @@ public class LogUtil {
      * column of the given Node. We use this routine to provide a cosistent
      * format for displaying file errors.
      */
-    public static final String formatFileString(final AbstractVmNode node) {
+    public static String formatFileString(final AbstractVmNode node) {
         return formatFileString(node.getTemplateName(), node.getLine(), node.getColumn());
     }
 
@@ -57,7 +59,7 @@ public class LogUtil {
      * Simply creates a string that formats the template filename with line
      * number and column. We use this routine to provide a cosistent format for
      * displaying file errors.
-     * 
+     *
      * @param template
      *            File name of template, can be null
      * @param linenum
@@ -65,7 +67,7 @@ public class LogUtil {
      * @param colnum
      *            Column number withing the file at linenum
      */
-    public static final String formatFileString(String template, final int linenum, final int colnum) {
+    public static String formatFileString(String template, final int linenum, final int colnum) {
         if (template == null || "".equals(template)) {
             template = "<unknown template>";
         }

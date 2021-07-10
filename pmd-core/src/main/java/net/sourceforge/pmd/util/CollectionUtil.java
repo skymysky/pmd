@@ -8,12 +8,16 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+
+import net.sourceforge.pmd.annotation.InternalApi;
 
 /**
  * Generic collection and array-related utility functions for java.util types.
@@ -21,7 +25,10 @@ import java.util.Set;
  *
  * @author Brian Remedios
  * @version $Revision$
+ * @deprecated Is internal API
  */
+@Deprecated
+@InternalApi
 public final class CollectionUtil {
 
     @SuppressWarnings("PMD.UnnecessaryFullyQualifiedName")
@@ -162,6 +169,35 @@ public final class CollectionUtil {
         return map;
     }
 
+
+    /**
+     * Consumes all the elements of the iterator and
+     * returns a list containing them. The iterator is
+     * then unusable
+     *
+     * @param it An iterator
+     *
+     * @return a list containing the elements remaining
+     * on the iterator
+     */
+    public static <T> List<T> toList(Iterator<T> it) {
+        List<T> list = new ArrayList<>();
+        while (it.hasNext()) {
+            list.add(it.next());
+        }
+        return list;
+    }
+
+    @SafeVarargs
+    public static <T> List<T> listOf(T first, T... rest) {
+        // note: 7.0.x already has a better version of that
+        ArrayList<T> result = new ArrayList<>(rest.length + 1);
+        result.add(first);
+        Collections.addAll(result, rest);
+        return result;
+    }
+
+
     /**
      * Returns true if the objects are array instances and each of their
      * elements compares via equals as well.
@@ -197,7 +233,7 @@ public final class CollectionUtil {
      */
     @Deprecated
     public static boolean valuesAreTransitivelyEqual(Object[] thisArray, Object[] thatArray) {
-        if (thisArray == thatArray) {
+        if (thisArray == thatArray) { //NOPMD: we really want to compare references here
             return true;
         }
         if (thisArray == null || thatArray == null) {

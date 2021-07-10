@@ -1,18 +1,17 @@
-/**
+/*
  * BSD-style license; for more info see http://pmd.sourceforge.net/license.html
  */
 
 package net.sourceforge.pmd.lang.java.rule.documentation;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import org.apache.commons.lang3.StringUtils;
-
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.lang.java.ast.ASTClassOrInterfaceBody;
 import net.sourceforge.pmd.lang.java.ast.ASTClassOrInterfaceDeclaration;
@@ -21,153 +20,65 @@ import net.sourceforge.pmd.lang.java.ast.ASTConstructorDeclaration;
 import net.sourceforge.pmd.lang.java.ast.ASTEnumDeclaration;
 import net.sourceforge.pmd.lang.java.ast.ASTFieldDeclaration;
 import net.sourceforge.pmd.lang.java.ast.ASTMethodDeclaration;
+import net.sourceforge.pmd.lang.java.ast.ASTPackageDeclaration;
 import net.sourceforge.pmd.lang.java.ast.AbstractJavaAccessNode;
 import net.sourceforge.pmd.lang.java.ast.AbstractJavaAccessTypeNode;
+import net.sourceforge.pmd.lang.java.ast.AbstractJavaNode;
 import net.sourceforge.pmd.lang.java.ast.Comment;
+import net.sourceforge.pmd.lang.java.ast.CommentUtil;
 import net.sourceforge.pmd.lang.java.ast.FormalComment;
-import net.sourceforge.pmd.lang.java.ast.MultiLineComment;
-import net.sourceforge.pmd.lang.java.ast.SingleLineComment;
+import net.sourceforge.pmd.lang.java.ast.JavadocElement;
+import net.sourceforge.pmd.lang.java.javadoc.JavadocTag;
 import net.sourceforge.pmd.lang.java.rule.AbstractJavaRule;
 
 /**
- * 
+ *
  * @author Brian Remedios
+ * @deprecated Internal API
  */
+@Deprecated
+@InternalApi
 public abstract class AbstractCommentRule extends AbstractJavaRule {
 
-    protected AbstractCommentRule() {
-    }
-
+    /**
+     * Returns a list of indices of javadoc tag occurrences in the comment.
+     *
+     * <p>Note: if the same tag occurs multiple times, only the last occurrence is returned.
+     *
+     * @param comments the complete comment text
+     * @return list of indices.
+     *
+     * @deprecated This method is deprecated and will be removed with PMD 7.0.0.
+     *      It is not very useful, since it doesn't extract the information
+     *      in a useful way. You would still need check, which tags have been found, and with which
+     *      data they might be accompanied.
+     *      A more useful solution will be added around the AST node {@link FormalComment},
+     *      which contains as children {@link JavadocElement} nodes, which in
+     *      turn provide access to the {@link JavadocTag}.
+     */
+    @Deprecated // the method will be removed with PMD 7.0.0
     protected List<Integer> tagsIndicesIn(String comments) {
-
-        int atPos = comments.indexOf('@');
-        if (atPos < 0) {
-            return Collections.emptyList();
-        }
-
-        List<Integer> ints = new ArrayList<>();
-        ints.add(atPos);
-
-        atPos = comments.indexOf('@', atPos + 1);
-        while (atPos >= 0) {
-            ints.add(atPos);
-            atPos = comments.indexOf('@', atPos + 1);
-        }
-
-        return ints;
+        Map<String, Integer> tags = CommentUtil.javadocTagsIn(comments);
+        return new ArrayList<>(tags.values());
     }
 
     protected String filteredCommentIn(Comment comment) {
-
-        String trimmed = comment.getImage().trim();
-
-        if (comment instanceof SingleLineComment) {
-            return singleLineIn(trimmed);
-        }
-        if (comment instanceof MultiLineComment) {
-            return multiLinesIn(trimmed);
-        }
-        if (comment instanceof FormalComment) {
-            return formalLinesIn(trimmed);
-        }
-
-        return trimmed; // should never reach here
-    }
-
-    private String singleLineIn(String comment) {
-
-        if (comment.startsWith("//")) {
-            return comment.substring(2);
-        }
-
-        return comment;
-    }
-
-    private static String asSingleString(List<String> lines) {
-
-        StringBuilder sb = new StringBuilder();
-        for (String line : lines) {
-            if (StringUtils.isBlank(line)) {
-                continue;
-            }
-            sb.append(line).append('\n');
-        }
-
-        return sb.toString().trim();
-    }
-
-    private static String multiLinesIn(String comment) {
-
-        String[] lines = comment.split("\n");
-        List<String> filteredLines = new ArrayList<>(lines.length);
-
-        for (String rawLine : lines) {
-            String line = rawLine.trim();
-
-            if (line.endsWith("*/")) {
-                int end = line.length() - 2;
-                int start = line.startsWith("/*") ? 2 : 0;
-                filteredLines.add(line.substring(start, end));
-                continue;
-            }
-
-            if (line.length() > 0 && line.charAt(0) == '*') {
-                filteredLines.add(line.substring(1));
-                continue;
-            }
-
-            if (line.startsWith("/*")) {
-                filteredLines.add(line.substring(2));
-                continue;
-            }
-
-        }
-
-        return asSingleString(filteredLines);
-    }
-
-    private String formalLinesIn(String comment) {
-
-        String[] lines = comment.split("\n");
-        List<String> filteredLines = new ArrayList<>(lines.length);
-
-        for (String origLine : lines) {
-            String line = origLine.trim();
-
-            if (line.endsWith("*/")) {
-                filteredLines.add(line.substring(0, line.length() - 2));
-                continue;
-            }
-
-            if (line.length() > 0 && line.charAt(0) == '*') {
-                filteredLines.add(line.substring(1));
-                continue;
-            }
-            if (line.startsWith("/**")) {
-                filteredLines.add(line.substring(3));
-                continue;
-            }
-
-        }
-
-        return asSingleString(filteredLines);
+        return comment.getFilteredComment();
     }
 
     protected void assignCommentsToDeclarations(ASTCompilationUnit cUnit) {
 
         SortedMap<Integer, Node> itemsByLineNumber = orderedCommentsAndDeclarations(cUnit);
         FormalComment lastComment = null;
-        AbstractJavaAccessNode lastNode = null;
+        AbstractJavaNode lastNode = null;
 
         for (Entry<Integer, Node> entry : itemsByLineNumber.entrySet()) {
             Node value = entry.getValue();
-
-            if (value instanceof AbstractJavaAccessNode) {
-                AbstractJavaAccessNode node = (AbstractJavaAccessNode) value;
-
+            if (value instanceof AbstractJavaAccessNode || value instanceof ASTPackageDeclaration) {
+                AbstractJavaNode node = (AbstractJavaNode) value;
                 // maybe the last comment is within the last node
-                if (lastComment != null && isCommentNotWithin(lastComment, lastNode, node)
-                        && isCommentBefore(lastComment, node)) {
+                if (lastComment != null && isCommentNotWithin(lastComment, lastNode, value)
+                        && isCommentBefore(lastComment, value)) {
                     node.comment(lastComment);
                     lastComment = null;
                 }
@@ -188,8 +99,8 @@ public abstract class AbstractCommentRule extends AbstractJavaRule {
                 || n1.getEndLine() == n2.getEndLine() && n1.getEndColumn() < n2.getEndColumn());
         boolean isNotSameClass = node.getFirstParentOfType(ASTClassOrInterfaceBody.class) != n2
                 .getFirstParentOfType(ASTClassOrInterfaceBody.class);
-        boolean isNodeWithinNode2 = (node.getEndLine() < n2.getEndLine()
-                || node.getEndLine() == n2.getEndLine() && node.getEndColumn() < n2.getEndColumn());
+        boolean isNodeWithinNode2 = node.getEndLine() < n2.getEndLine()
+                || node.getEndLine() == n2.getEndLine() && node.getEndColumn() < n2.getEndColumn();
         return isNotWithinNode2 || isNotSameClass || isNodeWithinNode2;
     }
 
@@ -199,26 +110,21 @@ public abstract class AbstractCommentRule extends AbstractJavaRule {
     }
 
     protected SortedMap<Integer, Node> orderedCommentsAndDeclarations(ASTCompilationUnit cUnit) {
-
         SortedMap<Integer, Node> itemsByLineNumber = new TreeMap<>();
 
-        List<ASTClassOrInterfaceDeclaration> packageDecl = cUnit
-                .findDescendantsOfType(ASTClassOrInterfaceDeclaration.class);
-        addDeclarations(itemsByLineNumber, packageDecl);
+        addDeclarations(itemsByLineNumber, cUnit.findDescendantsOfType(ASTPackageDeclaration.class, true));
+
+        addDeclarations(itemsByLineNumber, cUnit.findDescendantsOfType(ASTClassOrInterfaceDeclaration.class, true));
 
         addDeclarations(itemsByLineNumber, cUnit.getComments());
 
-        List<ASTFieldDeclaration> fields = cUnit.findDescendantsOfType(ASTFieldDeclaration.class);
-        addDeclarations(itemsByLineNumber, fields);
+        addDeclarations(itemsByLineNumber, cUnit.findDescendantsOfType(ASTFieldDeclaration.class, true));
 
-        List<ASTMethodDeclaration> methods = cUnit.findDescendantsOfType(ASTMethodDeclaration.class);
-        addDeclarations(itemsByLineNumber, methods);
+        addDeclarations(itemsByLineNumber, cUnit.findDescendantsOfType(ASTMethodDeclaration.class, true));
 
-        List<ASTConstructorDeclaration> constructors = cUnit.findDescendantsOfType(ASTConstructorDeclaration.class);
-        addDeclarations(itemsByLineNumber, constructors);
+        addDeclarations(itemsByLineNumber, cUnit.findDescendantsOfType(ASTConstructorDeclaration.class, true));
 
-        List<ASTEnumDeclaration> enumDecl = cUnit.findDescendantsOfType(ASTEnumDeclaration.class);
-        addDeclarations(itemsByLineNumber, enumDecl);
+        addDeclarations(itemsByLineNumber, cUnit.findDescendantsOfType(ASTEnumDeclaration.class, true));
 
         return itemsByLineNumber;
     }

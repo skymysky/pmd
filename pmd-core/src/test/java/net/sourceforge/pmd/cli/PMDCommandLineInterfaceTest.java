@@ -4,12 +4,18 @@
 
 package net.sourceforge.pmd.cli;
 
+import static org.junit.Assert.assertTrue;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.contrib.java.lang.system.ExpectedSystemExit;
 import org.junit.contrib.java.lang.system.RestoreSystemProperties;
+
+import net.sourceforge.pmd.PMDConfiguration;
+import net.sourceforge.pmd.cache.NoopAnalysisCache;
+
 
 /**
  * Unit test for {@link PMDCommandLineInterface}
@@ -48,6 +54,19 @@ public class PMDCommandLineInterfaceTest {
         Assert.assertEquals("Foo.method", params.getProperties().getProperty("classAndMethodName"));
     }
 
+
+    @Test
+    public void testNoCacheSwitch() {
+        PMDParameters params = new PMDParameters();
+        String[] args = {"-d", "source_folder", "-f", "ideaj", "-R", "java-empty", "-cache", "/home/user/.pmd/cache", "-no-cache", };
+        PMDCommandLineInterface.extractParameters(params, args, "PMD");
+
+        assertTrue(params.isIgnoreIncrementalAnalysis());
+        PMDConfiguration config = params.toConfiguration();
+        assertTrue(config.isIgnoreIncrementalAnalysis());
+        assertTrue(config.getAnalysisCache() instanceof NoopAnalysisCache);
+    }
+
     @Test
     public void testSetStatusCodeOrExitDoExit() {
         exit.expectSystemExitWithStatus(0);
@@ -62,4 +81,11 @@ public class PMDCommandLineInterfaceTest {
         PMDCommandLineInterface.setStatusCodeOrExit(0);
         Assert.assertEquals(System.getProperty(PMDCommandLineInterface.STATUS_CODE_PROPERTY), "0");
     }
+
+    @Test
+    public void testBuildUsageText() {
+        // no exception..
+        Assert.assertNotNull(PMDCommandLineInterface.buildUsageText());
+    }
+
 }

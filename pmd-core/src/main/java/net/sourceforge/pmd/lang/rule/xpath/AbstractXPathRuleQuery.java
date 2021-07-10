@@ -9,12 +9,17 @@ import java.util.List;
 import java.util.Map;
 
 import net.sourceforge.pmd.RuleContext;
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.properties.PropertyDescriptor;
 
 /**
  * This implementation of XPathRuleQuery provides support for RuleChain visits.
+ *
+ * @deprecated Internal API
  */
+@Deprecated
+@InternalApi
 public abstract class AbstractXPathRuleQuery implements XPathRuleQuery {
 
     /**
@@ -37,17 +42,11 @@ public abstract class AbstractXPathRuleQuery implements XPathRuleQuery {
      */
     protected final List<String> ruleChainVisits = new ArrayList<>();
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public void setXPath(String xpath) {
+    public void setXPath(final String xpath) {
         this.xpath = xpath;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void setVersion(String version) throws UnsupportedOperationException {
         if (!isSupportedVersion(version)) {
@@ -68,25 +67,16 @@ public abstract class AbstractXPathRuleQuery implements XPathRuleQuery {
      */
     protected abstract boolean isSupportedVersion(String version);
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void setProperties(Map<PropertyDescriptor<?>, Object> properties) {
         this.properties = properties;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public List<String> getRuleChainVisits() {
         return ruleChainVisits;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public abstract List<Node> evaluate(Node node, RuleContext data);
 }

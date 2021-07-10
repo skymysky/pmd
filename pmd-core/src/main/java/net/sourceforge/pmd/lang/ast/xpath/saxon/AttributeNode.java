@@ -4,7 +4,11 @@
 
 package net.sourceforge.pmd.lang.ast.xpath.saxon;
 
+import java.util.List;
+
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.ast.xpath.Attribute;
+import net.sourceforge.pmd.lang.ast.xpath.internal.DeprecatedAttrLogger;
 import net.sourceforge.pmd.lang.rule.xpath.SaxonXPathRuleQuery;
 
 import net.sf.saxon.om.NodeInfo;
@@ -15,20 +19,28 @@ import net.sf.saxon.value.Value;
 
 /**
  * A Saxon OM Attribute node for an AST Node Attribute.
+ * Belongs to an {@link ElementNode}, and wraps an
+ * {@link Attribute}.
  */
-public class AttributeNode extends AbstractNodeInfo {
+@Deprecated
+@InternalApi
+public class AttributeNode extends BaseNodeInfo {
+
     protected final Attribute attribute;
     protected final int id;
     protected Value value;
 
-    public AttributeNode(Attribute attribute, int id) {
+
+    /**
+     * Creates a new AttributeNode from a PMD Attribute.
+     *
+     * @param parent Parent elemtn
+     * @param id     The index within the attribute order
+     */
+    public AttributeNode(ElementNode parent, Attribute attribute, int id) {
+        super(Type.ATTRIBUTE, parent.getNamePool(), attribute.getName(), parent);
         this.attribute = attribute;
         this.id = id;
-    }
-
-    @Override
-    public int getNodeKind() {
-        return Type.ATTRIBUTE;
     }
 
     @Override
@@ -36,16 +48,21 @@ public class AttributeNode extends AbstractNodeInfo {
         return attribute.getName();
     }
 
-    @Override
-    public String getURI() {
-        return "";
+    private DeprecatedAttrLogger getAttrCtx() {
+        return parent == null ? DeprecatedAttrLogger.noop()
+                              : parent.document.getAttrCtx();
     }
 
     @Override
-    public Value atomize() throws XPathException {
+    public Value atomize() {
+        getAttrCtx().recordUsageOf(attribute);
         if (value == null) {
-            Object v = attribute.getValue();
-            value = SaxonXPathRuleQuery.getAtomicRepresentation(v);
+            Object data = attribute.getValue();
+            if (data instanceof List) {
+                value = SaxonXPathRuleQuery.getSequenceRepresentation((List<?>) data);
+            } else {
+                value = SaxonXPathRuleQuery.getAtomicRepresentation(attribute.getValue());
+            }
         }
         return value;
     }
@@ -62,6 +79,7 @@ public class AttributeNode extends AbstractNodeInfo {
 
     @Override
     public int compareOrder(NodeInfo other) {
+
         return Integer.signum(this.id - ((AttributeNode) other).id);
     }
 }

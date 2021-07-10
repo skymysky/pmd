@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.io.StringReader;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Level;
@@ -18,13 +18,20 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.io.IOUtils;
 
+import net.sourceforge.pmd.annotation.InternalApi;
+
 /**
  * Provides a simple filter mechanism to avoid failing to parse an old ruleset,
  * which references rules, that have either been removed from PMD already or
  * renamed or moved to another ruleset.
  *
  * @see <a href="https://sourceforge.net/p/pmd/bugs/1360/">issue 1360</a>
+ *
+ * @deprecated Use {@link RuleSetLoader#enableCompatibility(boolean)} to enable this feature.
+ *  This implementation is internal API.
  */
+@InternalApi
+@Deprecated
 public class RuleSetFactoryCompatibility {
     private static final Logger LOG = Logger.getLogger(RuleSetFactoryCompatibility.class.getName());
 
@@ -61,12 +68,11 @@ public class RuleSetFactoryCompatibility {
         addFilterRuleMoved("java", "basic", "unnecessary", "UselessOperationOnImmutable");
         addFilterRuleMoved("java", "basic", "unnecessary", "UnusedNullCheckInEquals");
         addFilterRuleMoved("java", "basic", "unnecessary", "UselessParentheses");
-        
+
         // PMD 5.6.0
         addFilterRuleRenamed("java", "design", "AvoidConstantsInterface", "ConstantsInInterface");
         // unused/UnusedModifier moved AND renamed, order is important!
-        addFilterRuleMoved("java", "unusedcode", "unnecessary", "UnusedModifier");
-        addFilterRuleRenamed("java", "unnecessary", "UnusedModifier", "UnnecessaryModifier");
+        addFilterRuleMovedAndRenamed("java", "unusedcode", "UnusedModifier", "unnecessary", "UnnecessaryModifier");
 
         // PMD 6.0.0
         addFilterRuleMoved("java", "controversial", "unnecessary", "UnnecessaryParentheses");
@@ -79,9 +85,13 @@ public class RuleSetFactoryCompatibility {
         addFilterRuleRenamed("java", "unnecessary", "UnnecessaryFinalModifier", "UnnecessaryModifier");
         addFilterRuleRenamed("java", "empty", "EmptyStaticInitializer", "EmptyInitializer");
         // GuardLogStatementJavaUtil moved and renamed...
-        addFilterRuleMoved("java", "logging-java", "logging-jakarta-commons", "GuardLogStatementJavaUtil");
-        addFilterRuleRenamed("java", "logging-jakarta-commons", "GuardLogStatementJavaUtil", "GuardLogStatement");
+        addFilterRuleMovedAndRenamed("java", "logging-java", "GuardLogStatementJavaUtil", "logging-jakarta-commons", "GuardLogStatement");
         addFilterRuleRenamed("java", "logging-jakarta-commons", "GuardDebugLogging", "GuardLogStatement");
+    }
+
+    void addFilterRuleMovedAndRenamed(String language, String oldRuleset, String oldName, String newRuleset, String newName) {
+        filters.add(RuleSetFilter.ruleMoved(language, oldRuleset, newRuleset, oldName));
+        filters.add(RuleSetFilter.ruleRenamedMoved(language, newRuleset, oldName, newName));
     }
 
     void addFilterRuleRenamed(String language, String ruleset, String oldName, String newName) {
@@ -115,8 +125,8 @@ public class RuleSetFactoryCompatibility {
         return new StringReader(ruleset);
     }
 
-    private String applyAllFilters(String in) {
-        String result = in;
+    private String applyAllFilters(String ruleset) {
+        String result = ruleset;
         for (RuleSetFilter filter : filters) {
             result = filter.apply(result);
         }
@@ -135,9 +145,9 @@ public class RuleSetFactoryCompatibility {
      */
     String determineEncoding(byte[] bytes) {
         String firstBytes = new String(bytes, 0, bytes.length > 1024 ? 1024 : bytes.length,
-                Charset.forName("ISO-8859-1"));
+                StandardCharsets.ISO_8859_1);
         Matcher matcher = ENCODING_PATTERN.matcher(firstBytes);
-        String encoding = Charset.forName("UTF-8").name();
+        String encoding = StandardCharsets.UTF_8.name();
         if (matcher.find()) {
             encoding = matcher.group(1);
         }
@@ -172,11 +182,15 @@ public class RuleSetFactoryCompatibility {
         }
 
         public static RuleSetFilter ruleRenamed(String language, String ruleset, String oldName, String newName) {
-            String base = "rulesets/" + language + "/" + ruleset + ".xml/";
-            RuleSetFilter filter = new RuleSetFilter(base + oldName, base + newName, "The rule \"" + oldName
-                    + "\" has been renamed to \"" + newName + "\". Please change your ruleset!");
+            RuleSetFilter filter = ruleRenamedMoved(language, ruleset, oldName, newName);
             filter.setExclusionPattern(oldName, newName);
             return filter;
+        }
+
+        public static RuleSetFilter ruleRenamedMoved(String language, String ruleset, String oldName, String newName) {
+            String base = "rulesets/" + language + "/" + ruleset + ".xml/";
+            return new RuleSetFilter(base + oldName, base + newName, "The rule \"" + oldName
+                    + "\" has been renamed to \"" + newName + "\". Please change your ruleset!");
         }
 
         public static RuleSetFilter ruleMoved(String language, String oldRuleset, String newRuleset, String ruleName) {
@@ -194,9 +208,9 @@ public class RuleSetFactoryCompatibility {
             return filter;
         }
 
-        String apply(String in) {
-            String result = in;
-            Matcher matcher = refPattern.matcher(in);
+        String apply(String ruleset) {
+            String result = ruleset;
+            Matcher matcher = refPattern.matcher(ruleset);
 
             if (matcher.find()) {
                 result = matcher.replaceAll(replacement);

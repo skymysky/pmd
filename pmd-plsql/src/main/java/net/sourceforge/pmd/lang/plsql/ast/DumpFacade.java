@@ -10,6 +10,11 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ *
+ * @deprecated This class will be removed with PMD 7. The rule designer is a better way to inspect nodes.
+ */
+@Deprecated
 public class DumpFacade extends PLSQLParserVisitorAdapter {
 
     private PrintWriter writer;
@@ -45,7 +50,7 @@ public class DumpFacade extends PLSQLParserVisitorAdapter {
         writer.print(prefix);
 
         // 2) JJT Name of the Node
-        writer.print(node.toString());
+        writer.print(node.getXPathNodeName());
 
         //
         // If there are any additional details, then:

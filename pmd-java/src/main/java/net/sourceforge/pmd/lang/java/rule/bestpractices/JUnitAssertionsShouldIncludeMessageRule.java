@@ -7,6 +7,7 @@ package net.sourceforge.pmd.lang.java.rule.bestpractices;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.sourceforge.pmd.lang.java.ast.ASTArgumentList;
 import net.sourceforge.pmd.lang.java.ast.ASTArguments;
 import net.sourceforge.pmd.lang.java.ast.ASTExpression;
 import net.sourceforge.pmd.lang.java.ast.ASTName;
@@ -26,14 +27,14 @@ public class JUnitAssertionsShouldIncludeMessageRule extends AbstractJUnitRule {
         }
 
         public void check(Object ctx, ASTArguments node) {
-            if (node.getArgumentCount() == argumentsCount
-                    && node.jjtGetParent().jjtGetParent() instanceof ASTPrimaryExpression) {
-                ASTPrimaryExpression primary = (ASTPrimaryExpression) node.jjtGetParent().jjtGetParent();
-                if (primary.jjtGetChild(0) instanceof ASTPrimaryPrefix && primary.jjtGetChild(0).jjtGetNumChildren() > 0
-                        && primary.jjtGetChild(0).jjtGetChild(0) instanceof ASTName) {
-                    ASTName name = (ASTName) primary.jjtGetChild(0).jjtGetChild(0);
+            if (node.size() == argumentsCount
+                    && node.getNthParent(2) instanceof ASTPrimaryExpression) {
+                ASTPrimaryPrefix primaryPrefix = node.getNthParent(2).getFirstChildOfType(ASTPrimaryPrefix.class);
 
-                    if (name.hasImageEqualTo(this.assertionName)) {
+                if (primaryPrefix != null) {
+                    ASTName name = primaryPrefix.getFirstChildOfType(ASTName.class);
+
+                    if (name != null && name.hasImageEqualTo(this.assertionName)) {
                         if (isException(node)) {
                             return;
                         }
@@ -65,16 +66,31 @@ public class JUnitAssertionsShouldIncludeMessageRule extends AbstractJUnitRule {
         checks.add(new AssertionCall("assertEquals", 3) {
             @Override
             protected boolean isException(ASTArguments node) {
-                ASTExpression firstArgument = node.getFirstDescendantOfType(ASTExpression.class);
-                return firstArgument.getType() == null || firstArgument.getType() == String.class;
+                // consider the top-level expressions of the arguments: Arguments/ArgumentList/Expression
+                ASTArgumentList argumentList = node.getFirstChildOfType(ASTArgumentList.class);
+                List<ASTExpression> arguments = argumentList.findChildrenOfType(ASTExpression.class);
+                boolean isExceptionJunit4 = isStringTypeOrNull(arguments.get(0));
+                boolean isExceptionJunit5 = isStringTypeOrNull(arguments.get(2));
+
+                return isExceptionJunit4 || isExceptionJunit5;
             }
         });
     }
 
+    @Override
     public Object visit(ASTArguments node, Object data) {
         for (AssertionCall call : checks) {
             call.check(data, node);
         }
         return super.visit(node, data);
+    }
+
+    /**
+     * @param node
+     *            the node to check
+     * @return {@code true} if node's type is String or null, otherwise {@code false}
+     */
+    private boolean isStringTypeOrNull(ASTExpression node) {
+        return node.getType() == String.class || node.getType() == null;
     }
 }

@@ -17,21 +17,23 @@ package net.sourceforge.pmd.lang.vm.ast;
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
- * under the License.    
+ * under the License.
  */
 
 import net.sourceforge.pmd.lang.vm.util.LogUtil;
 
 /**
  * This is an extension of the ParseException, which also takes a template name.
- * 
+ *
  * <p>see also the original <code>org.apache.velocity.runtime.parser.ParseException</code></p>
- * 
+ *
  * @author <a href="hps@intermeta.de">Henning P. Schmiedehausen</a>
  * @version $Id: TemplateParseException.java 703544 2008-10-10 18:15:53Z nbubna
  *          $
  * @since 1.5
+ * @deprecated for removal in PMD 7.0.0
  */
+@Deprecated
 public class TemplateParseException extends ParseException {
     private static final long serialVersionUID = -3146323135623083918L;
 
@@ -46,7 +48,7 @@ public class TemplateParseException extends ParseException {
     /**
      * This constructor is used to add a template name to info cribbed from a
      * ParseException generated in the parser.
-     * 
+     *
      * @param currentTokenVal
      * @param expectedTokenSequencesVal
      * @param tokenImageVal
@@ -68,7 +70,7 @@ public class TemplateParseException extends ParseException {
      * This constructor calls its super class with the empty string to force the
      * "toString" method of parent class "Throwable" to print the error message
      * in the form: ParseException: &lt;result of getMessage&gt;
-     * 
+     *
      * @param currentTokenVal
      * @param expectedTokenSequencesVal
      * @param tokenImageVal
@@ -95,7 +97,7 @@ public class TemplateParseException extends ParseException {
 
     /**
      * Creates a new TemplateParseException object.
-     * 
+     *
      * @param message
      *            TODO: DOCUMENT ME!
      */
@@ -105,18 +107,18 @@ public class TemplateParseException extends ParseException {
     }
 
     /**
-     * returns the Template name where this exception occured.
-     * 
-     * @return The Template name where this exception occured.
+     * returns the Template name where this exception occurred.
+     *
+     * @return The Template name where this exception occurred.
      */
     public String getTemplateName() {
         return templateName;
     }
 
     /**
-     * returns the line number where this exception occured.
-     * 
-     * @return The line number where this exception occured.
+     * returns the line number where this exception occurred.
+     *
+     * @return The line number where this exception occurred.
      */
     public int getLineNumber() {
         if (currentToken != null && currentToken.next != null) {
@@ -127,9 +129,9 @@ public class TemplateParseException extends ParseException {
     }
 
     /**
-     * returns the column number where this exception occured.
-     * 
-     * @return The column number where this exception occured.
+     * returns the column number where this exception occurred.
+     *
+     * @return The column number where this exception occurred.
      */
     public int getColumnNumber() {
         if (currentToken != null && currentToken.next != null) {
@@ -147,7 +149,7 @@ public class TemplateParseException extends ParseException {
      * catch it (it gets thrown from the parser), then this method is called
      * during the printing of the final stack trace, and hence the correct error
      * message gets displayed.
-     * 
+     *
      * @return The error message.
      */
     @Override
@@ -160,7 +162,7 @@ public class TemplateParseException extends ParseException {
 
         int maxSize = 0;
 
-        final StringBuffer expected = new StringBuffer();
+        final StringBuilder expected = new StringBuilder();
 
         for (int i = 0; i < expectedTokenSequences.length; i++) {
             if (maxSize < expectedTokenSequences[i].length) {

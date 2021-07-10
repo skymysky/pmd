@@ -7,13 +7,13 @@ package net.sourceforge.pmd.util.viewer.model;
 import net.sourceforge.pmd.lang.ast.xpath.Attribute;
 
 /**
- * A toolkit for vaious attribute translations
+ * A toolkit for various attribute translations
  *
  * @author Boris Gruschko ( boris at gruschko.org )
  * @version $Id$
  */
 @Deprecated // to be removed with PMD 7.0.0
-public class AttributeToolkit {
+public final class AttributeToolkit {
 
     private AttributeToolkit() { }
 
@@ -21,8 +21,8 @@ public class AttributeToolkit {
      * formats a value for its usage in XPath expressions
      *
      * @param attribute
-     *            atribute which value should be formatted
-     * @return formmated value
+     *            attribute which value should be formatted
+     * @return formatted value
      */
     public static String formatValueForXPath(Attribute attribute) {
         return '\'' + attribute.getStringValue() + '\'';

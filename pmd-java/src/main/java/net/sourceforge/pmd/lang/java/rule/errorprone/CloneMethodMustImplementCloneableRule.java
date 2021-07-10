@@ -6,6 +6,7 @@ package net.sourceforge.pmd.lang.java.rule.errorprone;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import net.sourceforge.pmd.lang.ast.Node;
@@ -15,10 +16,8 @@ import net.sourceforge.pmd.lang.java.ast.ASTClassOrInterfaceDeclaration;
 import net.sourceforge.pmd.lang.java.ast.ASTClassOrInterfaceType;
 import net.sourceforge.pmd.lang.java.ast.ASTCompilationUnit;
 import net.sourceforge.pmd.lang.java.ast.ASTExtendsList;
-import net.sourceforge.pmd.lang.java.ast.ASTFormalParameters;
 import net.sourceforge.pmd.lang.java.ast.ASTImplementsList;
 import net.sourceforge.pmd.lang.java.ast.ASTMethodDeclaration;
-import net.sourceforge.pmd.lang.java.ast.ASTMethodDeclarator;
 import net.sourceforge.pmd.lang.java.rule.AbstractJavaRule;
 
 /**
@@ -46,14 +45,14 @@ public class CloneMethodMustImplementCloneableRule extends AbstractJavaRule {
         }
 
         // From this point on, this is a best effort, the auxclasspath is incomplete.
-        
+
         // TODO : Should we really care about this?
         // Shouldn't the type resolver / symbol table report missing classes and the user
         // know results are dependent on running under proper arguments?
         final ASTImplementsList impl = node.getFirstChildOfType(ASTImplementsList.class);
         if (impl != null) {
-            for (int ix = 0; ix < impl.jjtGetNumChildren(); ix++) {
-                final Node child = impl.jjtGetChild(ix);
+            for (int ix = 0; ix < impl.getNumChildren(); ix++) {
+                final Node child = impl.getChild(ix);
 
                 if (child.getClass() != ASTClassOrInterfaceType.class) {
                     continue;
@@ -70,8 +69,8 @@ public class CloneMethodMustImplementCloneableRule extends AbstractJavaRule {
             }
         }
 
-        if (node.jjtGetNumChildren() != 0 && node.jjtGetChild(0) instanceof ASTExtendsList) {
-            final ASTClassOrInterfaceType type = (ASTClassOrInterfaceType) node.jjtGetChild(0).jjtGetChild(0);
+        if (node.getNumChildren() != 0 && node.getChild(0) instanceof ASTExtendsList) {
+            final ASTClassOrInterfaceType type = (ASTClassOrInterfaceType) node.getChild(0).getChild(0);
             final Class<?> clazz = type.getType();
             if (clazz != null) {
                 return Cloneable.class.isAssignableFrom(clazz);
@@ -83,16 +82,17 @@ public class CloneMethodMustImplementCloneableRule extends AbstractJavaRule {
 
     @Override
     public Object visit(final ASTMethodDeclaration node, final Object data) {
+        super.visit(node, data);
+
         // Is this a clone method?
-        final ASTMethodDeclarator methodDeclarator = node.getFirstChildOfType(ASTMethodDeclarator.class);
-        if (!isCloneMethod(methodDeclarator)) {
+        if (!isCloneMethod(node)) {
             return data;
         }
 
         // Is the clone method just throwing CloneNotSupportedException?
         final ASTClassOrInterfaceDeclaration classOrInterface = node.getFirstParentOfType(ASTClassOrInterfaceDeclaration.class);
-        if (classOrInterface != null && //Don't analyze enums, which cannot subclass clone()
-            (node.isFinal() || classOrInterface.isFinal())) {
+        if (classOrInterface != null //Don't analyze enums, which cannot subclass clone()
+            && (node.isFinal() || classOrInterface.isFinal())) {
             if (node.findDescendantsOfType(ASTBlock.class).size() == 1) {
                 final List<ASTBlockStatement> blocks = node.findDescendantsOfType(ASTBlockStatement.class);
                 if (blocks.size() == 1) {
@@ -141,7 +141,7 @@ public class CloneMethodMustImplementCloneableRule extends AbstractJavaRule {
     /**
      * Determines all the class/interface declarations inside this compilation
      * unit, which implement Cloneable
-     * 
+     *
      * @param currentClass
      *            the node of the class, that is currently analyzed (inside this
      *            compilation unit)
@@ -150,23 +150,19 @@ public class CloneMethodMustImplementCloneableRule extends AbstractJavaRule {
     private Set<String> determineTopLevelCloneableClasses(final ASTClassOrInterfaceDeclaration currentClass) {
         final List<ASTClassOrInterfaceDeclaration> classes = currentClass.getFirstParentOfType(ASTCompilationUnit.class)
                 .findDescendantsOfType(ASTClassOrInterfaceDeclaration.class);
-        final Set<String> classesNames = new HashSet<String>();
+        final Set<String> classesNames = new HashSet<>();
         for (final ASTClassOrInterfaceDeclaration c : classes) {
-            if (c != currentClass && extendsOrImplementsCloneable(c)) {
+            if (!Objects.equals(c, currentClass) && extendsOrImplementsCloneable(c)) {
                 classesNames.add(c.getImage());
             }
         }
         return classesNames;
     }
 
-    public boolean isCloneMethod(final ASTMethodDeclarator node) {
-        if (!"clone".equals(node.getImage())) {
+    public boolean isCloneMethod(final ASTMethodDeclaration method) {
+        if (!"clone".equals(method.getName())) {
             return false;
         }
-        final int countParams = ((ASTFormalParameters) node.jjtGetChild(0)).jjtGetNumChildren();
-        if (countParams != 0) {
-            return false;
-        }
-        return true;
+        return method.getArity() == 0;
     }
 }

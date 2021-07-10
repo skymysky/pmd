@@ -1,4 +1,4 @@
-/**
+/*
  * BSD-style license; for more info see http://pmd.sourceforge.net/license.html
  */
 
@@ -9,15 +9,19 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import net.sourceforge.pmd.Rule;
+import net.sourceforge.pmd.annotation.InternalApi;
 
 import apex.jorje.semantic.ast.modifier.Annotation;
 
 public class ASTAnnotation extends AbstractApexNode<Annotation> {
 
+    @Deprecated
+    @InternalApi
     public ASTAnnotation(Annotation annotation) {
         super(annotation);
     }
 
+    @Override
     public Object jjtAccept(ApexParserVisitor visitor, Object data) {
         return visitor.visit(this, data);
     }
@@ -27,6 +31,10 @@ public class ASTAnnotation extends AbstractApexNode<Annotation> {
         return node.getType().getApexName();
     }
 
+    /**
+     * @deprecated Will be removed in 7.0, the AST shouldn't know about rules
+     */
+    @Deprecated
     public boolean suppresses(Rule rule) {
         final String ruleAnno = "PMD." + rule.getName();
 
@@ -35,7 +43,7 @@ public class ASTAnnotation extends AbstractApexNode<Annotation> {
                 String image = param.getImage();
 
                 if (image != null) {
-                    Set<String> paramValues = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+                    Set<String> paramValues = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
                     paramValues.addAll(Arrays.asList(image.replaceAll("\\s+", "").split(",")));
                     if (paramValues.contains("PMD") || paramValues.contains(ruleAnno) || paramValues.contains("all")) {
                         return true;
@@ -45,5 +53,9 @@ public class ASTAnnotation extends AbstractApexNode<Annotation> {
         }
 
         return false;
+    }
+
+    public boolean isResolved() {
+        return node.getType().isResolved();
     }
 }

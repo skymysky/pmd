@@ -6,7 +6,6 @@ package net.sourceforge.pmd.util.viewer.model;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
 import javax.swing.tree.TreeModel;
@@ -41,7 +40,7 @@ public class ASTModel implements TreeModel {
      */
     @Override
     public Object getChild(Object parent, int index) {
-        return ((Node) parent).jjtGetChild(index);
+        return ((Node) parent).getChild(index);
     }
 
     /**
@@ -49,7 +48,7 @@ public class ASTModel implements TreeModel {
      */
     @Override
     public int getChildCount(Object parent) {
-        return ((Node) parent).jjtGetNumChildren();
+        return ((Node) parent).getNumChildren();
     }
 
     /**
@@ -58,8 +57,8 @@ public class ASTModel implements TreeModel {
     @Override
     public int getIndexOfChild(Object parent, Object child) {
         Node node = (Node) parent;
-        for (int i = 0; i < node.jjtGetNumChildren(); i++) {
-            if (node.jjtGetChild(i).equals(child)) {
+        for (int i = 0; i < node.getNumChildren(); i++) {
+            if (node.getChild(i).equals(child)) {
                 return i;
             }
         }
@@ -71,7 +70,7 @@ public class ASTModel implements TreeModel {
      */
     @Override
     public boolean isLeaf(Object node) {
-        return ((Node) node).jjtGetNumChildren() == 0;
+        return ((Node) node).getNumChildren() == 0;
     }
 
     /**

@@ -24,11 +24,13 @@ public class GenericLiteralCheckerRule extends AbstractJavaRule {
 
     private static final String PROPERTY_NAME = "regexPattern";
 
+    // The rule is unused
     private static final StringProperty REGEX_PROPERTY = new StringProperty(PROPERTY_NAME, "Regular expression", "",
             1.0f);
 
     public GenericLiteralCheckerRule() {
         definePropertyDescriptor(REGEX_PROPERTY);
+        addRuleChainVisit(ASTLiteral.class);
     }
 
     private void init() {

@@ -14,14 +14,22 @@ import net.sourceforge.pmd.lang.java.ast.JavaNode;
 import net.sourceforge.pmd.lang.java.ast.JavaParserVisitor;
 import net.sourceforge.pmd.lang.java.ast.JavaParserVisitorAdapter;
 import net.sourceforge.pmd.lang.rule.AbstractRuleChainVisitor;
+import net.sourceforge.pmd.lang.rule.RuleChainVisitor;
 import net.sourceforge.pmd.lang.rule.XPathRule;
 
+/**
+ * @deprecated for removal with PMD 7. A language dependent rule chain visitor is not needed anymore.
+ *      See {@link RuleChainVisitor}.
+ */
+@Deprecated
 public class JavaRuleChainVisitor extends AbstractRuleChainVisitor {
 
+    @Override
     protected void indexNodes(List<Node> nodes, RuleContext ctx) {
-        JavaParserVisitor javaParserVistor = new JavaParserVisitorAdapter() {
+        JavaParserVisitor javaParserVisitor = new JavaParserVisitorAdapter() {
             // Perform a visitation of the AST to index nodes which need
             // visiting by type
+            @Override
             public Object visit(JavaNode node, Object data) {
                 indexNode(node);
                 return super.visit(node, data);
@@ -29,10 +37,11 @@ public class JavaRuleChainVisitor extends AbstractRuleChainVisitor {
         };
 
         for (final Node node : nodes) {
-            javaParserVistor.visit((ASTCompilationUnit) node, ctx);
+            javaParserVisitor.visit((ASTCompilationUnit) node, ctx);
         }
     }
 
+    @Override
     protected void visit(Rule rule, Node node, RuleContext ctx) {
         // Rule better either be a JavaParserVisitor, or a XPathRule
         if (rule instanceof XPathRule) {

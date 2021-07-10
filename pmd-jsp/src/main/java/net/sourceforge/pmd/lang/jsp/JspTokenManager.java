@@ -6,13 +6,18 @@ package net.sourceforge.pmd.lang.jsp;
 
 import java.io.Reader;
 
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.TokenManager;
 import net.sourceforge.pmd.lang.ast.JavaCharStream;
 import net.sourceforge.pmd.lang.jsp.ast.JspParserTokenManager;
 
 /**
  * JSP Token Manager implementation.
+ *
+ * @deprecated This is internal API
  */
+@Deprecated
+@InternalApi
 public class JspTokenManager implements TokenManager {
     private final JspParserTokenManager tokenManager;
 
@@ -20,10 +25,12 @@ public class JspTokenManager implements TokenManager {
         tokenManager = new JspParserTokenManager(new JavaCharStream(source));
     }
 
+    @Override
     public Object getNextToken() {
         return tokenManager.getNextToken();
     }
 
+    @Override
     public void setFileName(String fileName) {
         JspParserTokenManager.setFileName(fileName);
     }

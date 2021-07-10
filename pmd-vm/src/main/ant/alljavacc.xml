@@ -28,17 +28,25 @@
     <target name="vmjjtree" description="Generates the VM parser and AST source files" unless="javaccBuildNotRequired">
         <delete dir="${target}/net/sourceforge/pmd/lang/vm/ast/" />
         <mkdir dir="${target}/net/sourceforge/pmd/lang/vm/ast/" />
-        <jjtree target="etc/grammar/VmParser.jjt"
-                outputdirectory="${target}/net/sourceforge/pmd/lang/vm/ast/"
-                javacchome="${javacc-home.path}" />
+        <java fork="true"
+              classname="jjtree"
+              classpath="${javacc-home.path}/javacc.jar">
+            <sysproperty key="file.encoding" value="UTF-8" />
+            <arg value="-OUTPUT_DIRECTORY:${target}/net/sourceforge/pmd/lang/vm/ast" />
+            <arg value="etc/grammar/VmParser.jjt" />
+        </java>
         <!-- Ensure generated using CharStream interface -->
-        <javacc static="false"
-                usercharstream="true"
-                unicodeinput="true"
-                javaunicodeescape="false"
-                target="${target}/net/sourceforge/pmd/lang/vm/ast/VmParser.jj"
-                outputdirectory="${target}/net/sourceforge/pmd/lang/vm/ast"
-                javacchome="${javacc-home.path}" />
+        <java fork="true"
+              classname="javacc"
+              classpath="${javacc-home.path}/javacc.jar">
+            <sysproperty key="file.encoding" value="UTF-8" />
+            <arg value="-STATIC:false" />
+            <arg value="-USER_CHAR_STREAM:true" />
+            <arg value="-UNICODE_INPUT:true" />
+            <arg value="-JAVA_UNICODE_ESCAPE:false" />
+            <arg value="-OUTPUT_DIRECTORY:${target}/net/sourceforge/pmd/lang/vm/ast" />
+            <arg value="${target}/net/sourceforge/pmd/lang/vm/ast/VmParser.jj" />
+        </java>
         <delete file="${target}/net/sourceforge/pmd/lang/vm/ast/Node.java" />
         <delete file="${target}/net/sourceforge/pmd/lang/vm/ast/SimpleNode.java" />
         <delete file="${target}/net/sourceforge/pmd/lang/vm/ast/CharStream.java" />
@@ -121,7 +129,46 @@ public class Token implements GenericToken, java.io.Serializable]]></replacevalu
     return endColumn;
   }
 
+  @Override
+  public int getKind() {
+    return kind;
+  }
+
 ]]></replacevalue>
         </replace>
+
+
+
+        <replaceregexp>
+            <regexp pattern="public (?:class|interface)" />
+            <substitution expression="@Deprecated${line.separator}@net.sourceforge.pmd.annotation.InternalApi${line.separator}\0" />
+            <fileset dir="${target}/net/sourceforge/pmd/lang/vm/ast">
+                <exclude name="AST*.java" />
+                <exclude name="ParseException.java" />
+                <exclude name="*ParserVisitor.java"/>
+            </fileset>
+        </replaceregexp>
+
+        <replaceregexp>
+            <regexp pattern="(?m)\*/\s+(public class ParseException )" />
+            <substitution expression="*${line.separator} * @deprecated Use superclass {@link net.sourceforge.pmd.lang.ast.ParseException}${line.separator} */${line.separator}@Deprecated${line.separator}@net.sourceforge.pmd.annotation.InternalApi${line.separator}\1 " />
+            <fileset file="${target}/net/sourceforge/pmd/lang/vm/ast/ParseException.java"/>
+        </replaceregexp>
+
+        <!-- mark constructors of AST* InternalApi -->
+        <replaceregexp>
+            <regexp pattern="public AST.+\(int id\)" />
+            <substitution expression="@Deprecated @net.sourceforge.pmd.annotation.InternalApi \0"/>
+            <fileset dir="${target}/net/sourceforge/pmd/lang/vm/ast">
+              <include name="AST*.java" />
+            </fileset>
+        </replaceregexp>
+        <replaceregexp>
+            <regexp pattern="public AST.+\(VmParser p, int id\)" />
+            <substitution expression="@Deprecated @net.sourceforge.pmd.annotation.InternalApi \0"/>
+            <fileset dir="${target}/net/sourceforge/pmd/lang/vm/ast">
+              <include name="AST*.java" />
+            </fileset>
+        </replaceregexp>
     </target>
 </project>

@@ -17,30 +17,34 @@ package net.sourceforge.pmd.lang.vm.directive;
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
- * under the License.    
+ * under the License.
  */
 
 /**
  * This class implements the #stop directive which allows a user to stop the
  * merging and rendering process. The #stop directive will accept a single
  * message argument with info about the reason for stopping.
+ * @deprecated for removal in PMD 7.0.0
  */
+@Deprecated
 public class Stop extends Directive {
 
     /**
      * Return name of this directive.
-     * 
+     *
      * @return The name of this directive.
      */
+    @Override
     public String getName() {
         return "stop";
     }
 
     /**
      * Return type of this directive.
-     * 
+     *
      * @return The type of this directive.
      */
+    @Override
     public int getType() {
         return LINE;
     }
@@ -49,6 +53,7 @@ public class Stop extends Directive {
      * Since there is no processing of content, there is never a need for an
      * internal scope.
      */
+    @Override
     public boolean isScopeProvided() {
         return false;
     }

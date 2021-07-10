@@ -11,11 +11,12 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.ResourceBundle;
 
-import org.apache.commons.io.IOUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 /**
  *
@@ -28,6 +29,9 @@ public class DBTypeTest {
     private Properties testProperties;
     private Properties includeProperties;
 
+    @Rule
+    public TemporaryFolder folder = new TemporaryFolder();
+
     @Before
     public void setUp() throws Exception {
         testProperties = new Properties();
@@ -39,24 +43,18 @@ public class DBTypeTest {
         includeProperties.putAll(testProperties);
         includeProperties.put("prop3", "include3");
 
-        PrintStream printStream = null;
-        try {
-            absoluteFile = File.createTempFile("dbtypetest", ".properties");
-            FileOutputStream fileOutputStream = new FileOutputStream(absoluteFile);
-            printStream = new PrintStream(fileOutputStream);
-
+        absoluteFile = folder.newFile();
+        try (FileOutputStream fileOutputStream = new FileOutputStream(absoluteFile);
+             PrintStream printStream = new PrintStream(fileOutputStream)) {
             for (Entry<?, ?> entry : testProperties.entrySet()) {
                 printStream.printf("%s=%s\n", entry.getKey(), entry.getValue());
             }
-        } finally {
-            IOUtils.closeQuietly(printStream);
         }
     }
 
     @After
     public void tearDown() throws Exception {
         testProperties = null;
-        absoluteFile.delete();
     }
 
     /**

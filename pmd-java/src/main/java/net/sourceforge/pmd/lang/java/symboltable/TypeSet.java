@@ -13,12 +13,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.lang.java.typeresolution.PMDASMClassLoader;
 import net.sourceforge.pmd.util.ClasspathClassLoader;
 
 /**
  * Keeps track of the types encountered in a ASTCompilationUnit
  */
+@Deprecated
+@InternalApi
 public class TypeSet {
 
     private final PMDASMClassLoader pmdClassLoader;
@@ -36,7 +39,7 @@ public class TypeSet {
 
     /**
      * The {@link TypeSet} provides type resolution for the symbol facade.
-     * 
+     *
      * @param classLoader
      *            the class loader to use to search classes (could be an
      *            auxiliary class path)
@@ -52,7 +55,7 @@ public class TypeSet {
 
     /**
      * Whether the classloader is using the auxclasspath or not.
-     * 
+     *
      * @return <code>true</code> if the classloader is using the auxclasspath
      *         feature
      */
@@ -83,7 +86,7 @@ public class TypeSet {
          * Checks if the given class could be resolved by this resolver. Notice,
          * that a resolver's ability to resolve a class does not imply that the
          * class will actually be found and resolved.
-         * 
+         *
          * @param name
          *            the name of the class, might be fully classified or not.
          * @return whether the class can be resolved
@@ -102,7 +105,7 @@ public class TypeSet {
 
         /**
          * Creates a new AbstractResolver that uses the given class loader.
-         * 
+         *
          * @param pmdClassLoader
          *            the class loader to use
          */
@@ -128,7 +131,8 @@ public class TypeSet {
                 try {
                     return pmdClassLoader.loadClass(className);
                 } catch (final ClassNotFoundException e) {
-                    // Ignored, can never actually happen
+                    // Ignored, can never actually happen, since we loaded the class at least once before...
+                    throw new RuntimeException(e); // in case it happens anyway
                 }
             }
 
@@ -144,8 +148,8 @@ public class TypeSet {
                             // Update the mapping
                             classNames.put(name, actualClassName);
                             return c;
-                        } catch (final ClassNotFoundException e) {
-                            // Ignored
+                        } catch (final ClassNotFoundException ignored) {
+                            // Ignored, we'll try again with a different class name, assuming inner classes
                         }
                     }
 
@@ -163,6 +167,7 @@ public class TypeSet {
             return null;
         }
 
+        @Override
         public boolean couldResolve(final String name) {
             /*
              * Resolvers based on this one, will attempt to load the class from
@@ -181,7 +186,7 @@ public class TypeSet {
 
         /**
          * Creates a new {@link ExplicitImportResolver}.
-         * 
+         *
          * @param pmdClassLoader
          *            the class loader to use.
          * @param importStmts
@@ -231,7 +236,7 @@ public class TypeSet {
 
         /**
          * Creates a new {@link CurrentPackageResolver}
-         * 
+         *
          * @param pmdClassLoader
          *            the class loader to use
          * @param pkg
@@ -290,7 +295,7 @@ public class TypeSet {
 
         /**
          * Creates a {@link ImplicitImportResolver}
-         * 
+         *
          * @param pmdClassLoader
          *            the class loader
          */
@@ -337,7 +342,7 @@ public class TypeSet {
 
         /**
          * Creates a {@link ImportOnDemandResolver}
-         * 
+         *
          * @param pmdClassLoader
          *            the class loader to use
          * @param importStmts
@@ -366,8 +371,8 @@ public class TypeSet {
                 if (pmdClassLoader.couldResolve(fqClassName)) {
                     try {
                         return pmdClassLoader.loadClass(fqClassName);
-                    } catch (ClassNotFoundException e) {
-                        // ignored
+                    } catch (ClassNotFoundException ignored) {
+                        // ignored, we'll throw a custom exception later
                     }
                 }
             }
@@ -405,7 +410,11 @@ public class TypeSet {
             types.put("long", long.class);
             types.put("boolean", boolean.class);
             types.put("byte", byte.class);
-            types.put("short", short.class);
+
+            @SuppressWarnings("PMD.AvoidUsingShortType") // scoping the suppression just for the following statement
+            Class<?> shortType = short.class;
+            types.put("short", shortType);
+
             types.put("char", char.class);
             PRIMITIVE_TYPES = Collections.unmodifiableMap(types);
         }
@@ -449,7 +458,7 @@ public class TypeSet {
     public static class FullyQualifiedNameResolver extends AbstractResolver {
         /**
          * Creates a {@link FullyQualifiedNameResolver}
-         * 
+         *
          * @param pmdClassLoader
          *            the class loader to use
          */
@@ -495,7 +504,7 @@ public class TypeSet {
 
     /**
      * Adds a import to the list of imports
-     * 
+     *
      * @param importString
      *            the import to add
      */
@@ -513,7 +522,7 @@ public class TypeSet {
 
     /**
      * Resolves a class by its name using all known resolvers.
-     * 
+     *
      * @param name
      *            the name of the class, can be a simple name or a fully
      *            qualified name.
@@ -530,7 +539,7 @@ public class TypeSet {
             if (resolver.couldResolve(name)) {
                 try {
                     return resolver.resolve(name);
-                } catch (ClassNotFoundException cnfe) {
+                } catch (ClassNotFoundException ignored) {
                     // ignored, maybe another resolver will find the class
                 } catch (LinkageError le) {
                     // we found the class, but there is a problem with it (see https://github.com/pmd/pmd/issues/328)

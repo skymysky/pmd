@@ -11,12 +11,13 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import net.sourceforge.pmd.lang.java.ast.JavaQualifiedName;
+import net.sourceforge.pmd.lang.java.JavaParsingHelper;
 import net.sourceforge.pmd.lang.java.multifile.signature.JavaFieldSigMask;
 import net.sourceforge.pmd.lang.java.multifile.signature.JavaOperationSigMask;
 import net.sourceforge.pmd.lang.java.multifile.signature.JavaOperationSignature.Role;
 import net.sourceforge.pmd.lang.java.multifile.signature.JavaSignature.Visibility;
 import net.sourceforge.pmd.lang.java.multifile.testdata.SignatureCountTestData;
+import net.sourceforge.pmd.lang.java.qname.QualifiedNameFactory;
 
 /**
  * @author Clément Fournier
@@ -33,11 +34,11 @@ public class ClassStatsTest {
     @Ignore("Exception in typeresolution visit")
     public void testCountOpSigs() {
 
-        JavaMultifileVisitorTest.parseAndVisitForClass(SignatureCountTestData.class);
+        JavaParsingHelper.WITH_PROCESSING.parseClass(SignatureCountTestData.class);
 
         final ProjectMirror toplevel = PackageStats.INSTANCE;
 
-        final ClassMirror classMirror = toplevel.getClassMirror(JavaQualifiedName.ofClass(SignatureCountTestData.class));
+        final ClassMirror classMirror = toplevel.getClassMirror(QualifiedNameFactory.ofClass(SignatureCountTestData.class));
 
         final FluentOperationSigMask opSigMask = new FluentOperationSigMask();
 

@@ -26,9 +26,11 @@ package net.sourceforge.pmd.lang.vm.directive;
  * actually defined). At render time we check whether there is a implementation
  * for the macro call. If an implementation cannot be found the literal text is
  * rendered.
- * 
+ *
  * @since 1.6
+ * @deprecated for removal in PMD 7.0.0
  */
+@Deprecated
 public class RuntimeMacro extends Directive {
     /**
      * Name of the macro
@@ -55,6 +57,7 @@ public class RuntimeMacro extends Directive {
      *
      * @return The name of this Velocimacro.
      */
+    @Override
     public String getName() {
         return macroName;
     }
@@ -65,6 +68,7 @@ public class RuntimeMacro extends Directive {
      * call. The macro name will instead be used as the scope name when defining
      * the body of a BlockMacro.
      */
+    @Override
     public String getScopeName() {
         return "macro";
     }
@@ -74,6 +78,7 @@ public class RuntimeMacro extends Directive {
      *
      * @return The type of this directive.
      */
+    @Override
     public int getType() {
         return LINE;
     }

@@ -23,6 +23,7 @@ import net.sourceforge.pmd.Rule;
  * @author Clément Fournier
  * @version 6.0.0
  */
+@Deprecated
 /* default */ abstract class AbstractMultiValueProperty<V> extends AbstractProperty<List<V>>
         implements MultiValuePropertyDescriptor<V> {
 
@@ -74,7 +75,7 @@ import net.sourceforge.pmd.Rule;
     }
 
 
-    /* This is the one overriden in PropertyDescriptor */
+    /* This is the one overridden in PropertyDescriptor */
     @Override
     public String propertyErrorFor(Rule rule) {
         List<V> realValues = rule.getProperty(this);
@@ -119,6 +120,7 @@ import net.sourceforge.pmd.Rule;
      *
      * @return A string representation of the default value.
      */
+    @Override
     protected String defaultAsString() {
         return asDelimitedString(defaultValue(), multiValueDelimiter());
     }
@@ -177,7 +179,7 @@ import net.sourceforge.pmd.Rule;
             return Collections.emptyList();
         }
 
-        String[] strValues = valueString.split(Pattern.quote("" + multiValueDelimiter()));
+        String[] strValues = valueString.split(Pattern.quote(String.valueOf(multiValueDelimiter())));
 
         List<V> values = new ArrayList<>(strValues.length);
         for (String strValue : strValues) {

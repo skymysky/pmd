@@ -14,6 +14,7 @@ import net.sourceforge.pmd.Rule;
  *
  * @author Clément Fournier
  */
+@Deprecated
 /* default */ abstract class AbstractSingleValueProperty<T> extends AbstractProperty<T>
         implements SingleValuePropertyDescriptor<T> {
 
@@ -24,10 +25,11 @@ import net.sourceforge.pmd.Rule;
     /**
      * Creates a single value property.
      *
-     * @param theName        Name of the property
-     * @param theDescription Description
-     * @param theUIOrder     UI order
-     * @param theDefault     Default value
+     * @param theName             Name of the property
+     * @param theDescription      Description
+     * @param theUIOrder          UI order
+     * @param theDefault          Default value
+     * @param isDefinedExternally Whether the property is defined in the XML (by a XPath rule) or not
      *
      * @throws IllegalArgumentException If name or description are empty, or UI order is negative.
      */

@@ -7,11 +7,13 @@ package net.sourceforge.pmd.testframework;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +26,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import org.apache.commons.io.IOUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -39,10 +40,10 @@ import net.sourceforge.pmd.Report;
 import net.sourceforge.pmd.Rule;
 import net.sourceforge.pmd.RuleContext;
 import net.sourceforge.pmd.RuleSet;
-import net.sourceforge.pmd.RuleSetFactory;
 import net.sourceforge.pmd.RuleSetNotFoundException;
 import net.sourceforge.pmd.RuleSets;
 import net.sourceforge.pmd.RuleViolation;
+import net.sourceforge.pmd.RulesetsFactoryUtils;
 import net.sourceforge.pmd.lang.LanguageRegistry;
 import net.sourceforge.pmd.lang.LanguageVersion;
 import net.sourceforge.pmd.properties.PropertyDescriptor;
@@ -85,12 +86,20 @@ public abstract class RuleTst {
         }
     }
 
+    protected void setUp() {
+        // This method is intended to be overridden by subclasses.
+    }
+
+    protected List<Rule> getRules() {
+        return Collections.emptyList();
+    }
+
     /**
      * Find a rule in a certain ruleset by name
      */
     public Rule findRule(String ruleSet, String ruleName) {
         try {
-            Rule rule = new RuleSetFactory().createRuleSets(ruleSet).getRuleByName(ruleName);
+            Rule rule = RulesetsFactoryUtils.defaultFactory().createRuleSets(ruleSet).getRuleByName(ruleName);
             if (rule == null) {
                 fail("Rule " + ruleName + " not found in ruleset " + ruleSet);
             } else {
@@ -138,9 +147,9 @@ public abstract class RuleTst {
 
                 report = processUsingStringReader(test, rule);
                 res = report.size();
-            } catch (Throwable t) {
-                t.printStackTrace();
-                throw new RuntimeException('"' + test.getDescription() + "\" failed", t);
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException('"' + test.getDescription() + "\" failed", e);
             }
             if (test.getNumberOfProblemsExpected() != res) {
                 printReport(test, report);
@@ -202,12 +211,13 @@ public abstract class RuleTst {
         }
 
         List<Integer> expected = test.getExpectedLineNumbers();
-        if (report.getViolationTree().size() != expected.size()) {
-            throw new RuntimeException("Test setup error: number of execpted line numbers doesn't match "
-                    + "number of violations for test case '" + test.getDescription() + "'");
+        if (report.size() != expected.size()) {
+            throw new RuntimeException("Test setup error: number of expected line numbers " + expected.size()
+                    + " doesn't match number of violations " + report.size() + " for test case '"
+                    + test.getDescription() + "'");
         }
 
-        Iterator<RuleViolation> it = report.getViolationTree().iterator();
+        Iterator<RuleViolation> it = report.iterator();
         int index = 0;
         while (it.hasNext()) {
             RuleViolation violation = it.next();
@@ -260,16 +270,31 @@ public abstract class RuleTst {
         try {
             PMD p = new PMD();
             p.getConfiguration().setDefaultLanguageVersion(languageVersion);
+            p.getConfiguration().setIgnoreIncrementalAnalysis(true);
             if (isUseAuxClasspath) {
                 // configure the "auxclasspath" option for unit testing
                 p.getConfiguration().prependClasspath(".");
+            } else {
+                // simple class loader, that doesn't delegate to parent.
+                // this allows us in the tests to simulate PMD run without
+                // auxclasspath, not even the classes from the test dependencies
+                // will be found.
+                p.getConfiguration().setClassLoader(new ClassLoader() {
+                    @Override
+                    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                        if (name.startsWith("java.") || name.startsWith("javax.")) {
+                            return super.loadClass(name, resolve);
+                        }
+                        throw new ClassNotFoundException(name);
+                    }
+                });
             }
             RuleContext ctx = new RuleContext();
             ctx.setReport(report);
-            ctx.setSourceCodeFilename("n/a");
+            ctx.setSourceCodeFile(new File("n/a"));
             ctx.setLanguageVersion(languageVersion);
             ctx.setIgnoreExceptions(false);
-            RuleSet rules = new RuleSetFactory().createSingleRuleRuleSet(rule);
+            RuleSet rules = RuleSet.forSingleRule(rule);
             p.getSourceCodeProcessor().processSourceCode(new StringReader(code), new RuleSets(rules), ctx);
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -318,25 +343,45 @@ public abstract class RuleTst {
      */
     public TestDescriptor[] extractTestsFromXml(Rule rule, String testsFileName, String baseDirectory) {
         String testXmlFileName = baseDirectory + testsFileName + ".xml";
-        InputStream inputStream = getClass().getResourceAsStream(testXmlFileName);
-        if (inputStream == null) {
-            throw new RuntimeException("Couldn't find " + testXmlFileName);
-        }
 
         Document doc;
-        try {
+        try (InputStream inputStream = getClass().getResourceAsStream(testXmlFileName)) {
+            if (inputStream == null) {
+                throw new RuntimeException("Couldn't find " + testXmlFileName);
+            }
             doc = documentBuilder.parse(inputStream);
-        } catch (FactoryConfigurationError fce) {
-            throw new RuntimeException("Couldn't parse " + testXmlFileName + ", due to: " + fce, fce);
-        } catch (IOException ioe) {
-            throw new RuntimeException("Couldn't parse " + testXmlFileName + ", due to: " + ioe, ioe);
-        } catch (SAXException se) {
-            throw new RuntimeException("Couldn't parse " + testXmlFileName + ", due to: " + se, se);
-        } finally {
-            IOUtils.closeQuietly(inputStream);
+        } catch (FactoryConfigurationError | IOException | SAXException e) {
+            throw new RuntimeException("Couldn't parse " + testXmlFileName + ", due to: " + e, e);
         }
 
         return parseTests(rule, doc);
+    }
+
+    /**
+     * Run a set of tests defined in an XML test-data file for a rule. The file
+     * should be ./xml/RuleName.xml relative to the test-class. The format is
+     * defined in test-data.xsd.
+     */
+    public void runTests(Rule rule) {
+        runTests(extractTestsFromXml(rule));
+    }
+
+    /**
+     * Run a set of tests defined in a XML test-data file. The file should be
+     * ./xml/[testsFileName].xml relative to the test-class. The format is
+     * defined in test-data.xsd.
+     */
+    public void runTests(Rule rule, String testsFileName) {
+        runTests(extractTestsFromXml(rule, testsFileName));
+    }
+
+    /**
+     * Run a set of tests of a certain sourceType.
+     */
+    public void runTests(TestDescriptor[] tests) {
+        for (int i = 0; i < tests.length; i++) {
+            runTest(tests[i]);
+        }
     }
 
     private TestDescriptor[] parseTests(Rule rule, Document doc) {
@@ -465,7 +510,7 @@ public abstract class RuleTst {
     }
 
     private static String parseTextNode(Node exampleNode) {
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder buffer = new StringBuilder();
         for (int i = 0; i < exampleNode.getChildNodes().getLength(); i++) {
             Node node = exampleNode.getChildNodes().item(i);
             if (node.getNodeType() == Node.CDATA_SECTION_NODE || node.getNodeType() == Node.TEXT_NODE) {

@@ -4,10 +4,14 @@
 
 package net.sourceforge.pmd.lang.java.rule.documentation;
 
+import static net.sourceforge.pmd.properties.PropertyFactory.booleanProperty;
+import static net.sourceforge.pmd.properties.PropertyFactory.stringListProperty;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
@@ -16,10 +20,8 @@ import net.sourceforge.pmd.Rule;
 import net.sourceforge.pmd.RuleContext;
 import net.sourceforge.pmd.lang.java.ast.ASTCompilationUnit;
 import net.sourceforge.pmd.lang.java.ast.Comment;
-import net.sourceforge.pmd.properties.BooleanProperty;
 import net.sourceforge.pmd.properties.PropertyDescriptor;
 import net.sourceforge.pmd.properties.PropertySource;
-import net.sourceforge.pmd.properties.StringMultiProperty;
 
 /**
  * A rule that checks for illegal words in the comment text.
@@ -31,22 +33,16 @@ import net.sourceforge.pmd.properties.StringMultiProperty;
 public class CommentContentRule extends AbstractCommentRule {
 
     private boolean caseSensitive;
-    private boolean wordsAreRegex;
     private List<String> originalBadWords;
     private List<String> currentBadWords;
 
-    // FIXME need some better defaults (or none?)
-    private static final String[] BAD_WORDS = {"idiot", "jerk" };
-
-    public static final BooleanProperty WORDS_ARE_REGEX_DESCRIPTOR = new BooleanProperty("wordsAreRegex",
-            "Use regular expressions", false, 1.0f);
-
     // ignored when property above == True
-    public static final BooleanProperty CASE_SENSITIVE_DESCRIPTOR = new BooleanProperty("caseSensitive",
-            "Case sensitive", false, 2.0f);
+    public static final PropertyDescriptor<Boolean> CASE_SENSITIVE_DESCRIPTOR = booleanProperty("caseSensitive").defaultValue(false).desc("Case sensitive").build();
 
-    public static final StringMultiProperty DISSALLOWED_TERMS_DESCRIPTOR = new StringMultiProperty("disallowedTerms",
-            "Illegal terms or phrases", BAD_WORDS, 3.0f, '|');
+    public static final PropertyDescriptor<List<String>> DISSALLOWED_TERMS_DESCRIPTOR =
+            stringListProperty("disallowedTerms")
+                    .desc("Illegal terms or phrases")
+                    .defaultValues("idiot", "jerk").build(); // TODO make blank property? or add more defaults?
 
     private static final Set<PropertyDescriptor<?>> NON_REGEX_PROPERTIES;
 
@@ -56,7 +52,6 @@ public class CommentContentRule extends AbstractCommentRule {
     }
 
     public CommentContentRule() {
-        definePropertyDescriptor(WORDS_ARE_REGEX_DESCRIPTOR);
         definePropertyDescriptor(CASE_SENSITIVE_DESCRIPTOR);
         definePropertyDescriptor(DISSALLOWED_TERMS_DESCRIPTOR);
     }
@@ -66,7 +61,6 @@ public class CommentContentRule extends AbstractCommentRule {
      */
     @Override
     public void start(RuleContext ctx) {
-        wordsAreRegex = getProperty(WORDS_ARE_REGEX_DESCRIPTOR);
         originalBadWords = getProperty(DISSALLOWED_TERMS_DESCRIPTOR);
         caseSensitive = getProperty(CASE_SENSITIVE_DESCRIPTOR);
         if (caseSensitive) {
@@ -74,15 +68,9 @@ public class CommentContentRule extends AbstractCommentRule {
         } else {
             currentBadWords = new ArrayList<>();
             for (String badWord : originalBadWords) {
-                currentBadWords.add(badWord.toUpperCase());
+                currentBadWords.add(badWord.toUpperCase(Locale.ROOT));
             }
         }
-    }
-
-    @Override
-    public Set<PropertyDescriptor<?>> ignoredProperties() {
-        return getProperty(WORDS_ARE_REGEX_DESCRIPTOR) ? NON_REGEX_PROPERTIES
-                                                       : Collections.<PropertyDescriptor<?>>emptySet();
     }
 
     /**
@@ -106,7 +94,7 @@ public class CommentContentRule extends AbstractCommentRule {
         }
 
         if (!caseSensitive) {
-            commentText = commentText.toUpperCase();
+            commentText = commentText.toUpperCase(Locale.ROOT);
         }
 
         List<String> foundWords = new ArrayList<>();
@@ -155,9 +143,14 @@ public class CommentContentRule extends AbstractCommentRule {
         return super.visit(cUnit, data);
     }
 
-    public boolean hasDissallowedTerms() {
+    private boolean hasDisallowedTerms() {
         List<String> terms = getProperty(DISSALLOWED_TERMS_DESCRIPTOR);
         return !terms.isEmpty();
+    }
+
+    @Deprecated
+    public boolean hasDissallowedTerms() {
+        return this.hasDisallowedTerms();
     }
 
     /**

@@ -16,6 +16,10 @@ import net.sourceforge.pmd.lang.plsql.ast.ASTTriggerUnit;
 import net.sourceforge.pmd.lang.plsql.ast.ASTTypeMethod;
 import net.sourceforge.pmd.lang.plsql.rule.AbstractPLSQLRule;
 
+/**
+ * @deprecated Only used by the deprecated designer
+ */
+@Deprecated
 public class DFAPLSQLGraphRule extends AbstractPLSQLRule implements DFAGraphRule {
 
     private List<DFAGraphMethod> executables;
@@ -24,6 +28,7 @@ public class DFAPLSQLGraphRule extends AbstractPLSQLRule implements DFAGraphRule
         super.setDfa(true);
     }
 
+    @Override
     public List<DFAGraphMethod> getMethods() {
         return this.executables;
     }

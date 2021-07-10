@@ -11,8 +11,10 @@ import java.io.Reader;
 import java.util.Collections;
 import java.util.List;
 
-import net.sourceforge.pmd.benchmark.Benchmark;
-import net.sourceforge.pmd.benchmark.Benchmarker;
+import net.sourceforge.pmd.annotation.InternalApi;
+import net.sourceforge.pmd.benchmark.TimeTracker;
+import net.sourceforge.pmd.benchmark.TimedOperation;
+import net.sourceforge.pmd.benchmark.TimedOperationCategory;
 import net.sourceforge.pmd.lang.Language;
 import net.sourceforge.pmd.lang.LanguageVersion;
 import net.sourceforge.pmd.lang.LanguageVersionHandler;
@@ -22,6 +24,11 @@ import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.lang.ast.ParseException;
 import net.sourceforge.pmd.lang.xpath.Initializer;
 
+/**
+ * Source code processor is internal.
+ */
+@Deprecated
+@InternalApi
 public class SourceCodeProcessor {
 
     private final PMDConfiguration configuration;
@@ -82,43 +89,57 @@ public class SourceCodeProcessor {
 
         // Coarse check to see if any RuleSet applies to file, will need to do a finer RuleSet specific check later
         if (ruleSets.applies(ctx.getSourceCodeFile())) {
-            // Is the cache up to date?
-            if (configuration.getAnalysisCache().isUpToDate(ctx.getSourceCodeFile())) {
-                for (final RuleViolation rv : configuration.getAnalysisCache().getCachedViolations(ctx.getSourceCodeFile())) {
-                    ctx.getReport().addRuleViolation(rv);
-                }
-                return;
-            }
-
-            try {
-                ruleSets.start(ctx);
-                processSource(sourceCode, ruleSets, ctx);
-            } catch (ParseException pe) {
-                configuration.getAnalysisCache().analysisFailed(ctx.getSourceCodeFile());
-                throw new PMDException("Error while parsing " + ctx.getSourceCodeFilename(), pe);
-            } catch (Exception e) {
-                configuration.getAnalysisCache().analysisFailed(ctx.getSourceCodeFile());
-                throw new PMDException("Error while processing " + ctx.getSourceCodeFilename(), e);
-            } finally {
-                ruleSets.end(ctx);
+            if (isCacheUpToDate(ctx)) {
+                reportCachedRuleViolations(ctx);
+            } else {
+                processSourceCodeWithoutCache(sourceCode, ruleSets, ctx);
             }
         }
     }
 
+    private boolean isCacheUpToDate(final RuleContext ctx) {
+        return configuration.getAnalysisCache().isUpToDate(ctx.getSourceCodeFile());
+    }
+
+    private void reportCachedRuleViolations(final RuleContext ctx) {
+        for (final RuleViolation rv : configuration.getAnalysisCache().getCachedViolations(ctx.getSourceCodeFile())) {
+            ctx.getReport().addRuleViolation(rv);
+        }
+    }
+
+    private void processSourceCodeWithoutCache(final Reader sourceCode, final RuleSets ruleSets, final RuleContext ctx) throws PMDException {
+        try {
+            ruleSets.start(ctx);
+            processSource(sourceCode, ruleSets, ctx);
+        } catch (ParseException pe) {
+            configuration.getAnalysisCache().analysisFailed(ctx.getSourceCodeFile());
+            throw new PMDException("Error while parsing " + ctx.getSourceCodeFile(), pe);
+        } catch (Exception e) {
+            configuration.getAnalysisCache().analysisFailed(ctx.getSourceCodeFile());
+            throw new PMDException("Error while processing " + ctx.getSourceCodeFile(), e);
+        } finally {
+            ruleSets.end(ctx);
+        }
+    }
+
     private Node parse(RuleContext ctx, Reader sourceCode, Parser parser) {
-        long start = System.nanoTime();
-        Node rootNode = parser.parse(ctx.getSourceCodeFilename(), sourceCode);
-        ctx.getReport().suppress(parser.getSuppressMap());
-        long end = System.nanoTime();
-        Benchmarker.mark(Benchmark.Parser, end - start, 0);
-        return rootNode;
+        try (TimedOperation to = TimeTracker.startOperation(TimedOperationCategory.PARSER)) {
+            Node rootNode = parser.parse(String.valueOf(ctx.getSourceCodeFile()), sourceCode);
+            ctx.getReport().suppress(parser.getSuppressMap());
+            return rootNode;
+        }
     }
 
     private void symbolFacade(Node rootNode, LanguageVersionHandler languageVersionHandler) {
-        long start = System.nanoTime();
-        languageVersionHandler.getSymbolFacade(configuration.getClassLoader()).start(rootNode);
-        long end = System.nanoTime();
-        Benchmarker.mark(Benchmark.SymbolTable, end - start, 0);
+        try (TimedOperation to = TimeTracker.startOperation(TimedOperationCategory.SYMBOL_TABLE)) {
+            languageVersionHandler.getSymbolFacade(configuration.getClassLoader()).start(rootNode);
+        }
+    }
+
+    private void resolveQualifiedNames(Node rootNode, LanguageVersionHandler handler) {
+        try (TimedOperation to = TimeTracker.startOperation(TimedOperationCategory.QUALIFIED_NAME_RESOLUTION)) {
+            handler.getQualifiedNameResolutionFacade(configuration.getClassLoader()).start(rootNode);
+        }
     }
 
     // private ParserOptions getParserOptions(final LanguageVersionHandler
@@ -132,11 +153,10 @@ public class SourceCodeProcessor {
 
     private void usesDFA(LanguageVersion languageVersion, Node rootNode, RuleSets ruleSets, Language language) {
         if (ruleSets.usesDFA(language)) {
-            long start = System.nanoTime();
-            VisitorStarter dataFlowFacade = languageVersion.getLanguageVersionHandler().getDataFlowFacade();
-            dataFlowFacade.start(rootNode);
-            long end = System.nanoTime();
-            Benchmarker.mark(Benchmark.DFA, end - start, 0);
+            try (TimedOperation to = TimeTracker.startOperation(TimedOperationCategory.DFA)) {
+                VisitorStarter dataFlowFacade = languageVersion.getLanguageVersionHandler().getDataFlowFacade();
+                dataFlowFacade.start(rootNode);
+            }
         }
     }
 
@@ -144,11 +164,10 @@ public class SourceCodeProcessor {
             Language language) {
 
         if (ruleSets.usesTypeResolution(language)) {
-            long start = System.nanoTime();
-            languageVersion.getLanguageVersionHandler().getTypeResolutionFacade(configuration.getClassLoader())
-                    .start(rootNode);
-            long end = System.nanoTime();
-            Benchmarker.mark(Benchmark.TypeResolution, end - start, 0);
+            try (TimedOperation to = TimeTracker.startOperation(TimedOperationCategory.TYPE_RESOLUTION)) {
+                languageVersion.getLanguageVersionHandler().getTypeResolutionFacade(configuration.getClassLoader())
+                        .start(rootNode);
+            }
         }
     }
 
@@ -157,10 +176,9 @@ public class SourceCodeProcessor {
                                Language language) {
 
         if (ruleSets.usesMultifile(language)) {
-            long start = System.nanoTime();
-            languageVersionHandler.getMultifileFacade().start(rootNode);
-            long end = System.nanoTime();
-            Benchmarker.mark(Benchmark.Multifile, end - start, 0);
+            try (TimedOperation to = TimeTracker.startOperation(TimedOperationCategory.MULTIFILE_ANALYSIS)) {
+                languageVersionHandler.getMultifileFacade().start(rootNode);
+            }
         }
     }
 
@@ -171,6 +189,7 @@ public class SourceCodeProcessor {
         Parser parser = PMD.parserFor(languageVersion, configuration);
 
         Node rootNode = parse(ctx, sourceCode, parser);
+        resolveQualifiedNames(rootNode, languageVersionHandler);
         symbolFacade(rootNode, languageVersionHandler);
         Language language = languageVersion.getLanguage();
         usesDFA(languageVersion, rootNode, ruleSets, language);

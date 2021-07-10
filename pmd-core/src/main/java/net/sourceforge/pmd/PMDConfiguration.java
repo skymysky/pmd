@@ -13,17 +13,20 @@ import java.util.Properties;
 import net.sourceforge.pmd.cache.AnalysisCache;
 import net.sourceforge.pmd.cache.FileAnalysisCache;
 import net.sourceforge.pmd.cache.NoopAnalysisCache;
+import net.sourceforge.pmd.cli.PmdParametersParseResult;
 import net.sourceforge.pmd.lang.LanguageRegistry;
 import net.sourceforge.pmd.lang.LanguageVersion;
 import net.sourceforge.pmd.lang.LanguageVersionDiscoverer;
 import net.sourceforge.pmd.renderers.Renderer;
 import net.sourceforge.pmd.renderers.RendererFactory;
 import net.sourceforge.pmd.util.ClasspathClassLoader;
-import net.sourceforge.pmd.util.IOUtil;
 
 /**
- * This class contains the details for the runtime configuration of PMD. There
- * are several aspects to the configuration of PMD.
+ * This class contains the details for the runtime configuration of a PMD run.
+ * You can either create one and set individual fields, or mimic a CLI run by
+ * using {@link PmdParametersParseResult#extractParameters(String...) extractParameters}.
+ *
+ * <p>There are several aspects to the configuration of PMD.
  *
  * <p>The aspects related to generic PMD behavior:</p>
  * <ul>
@@ -80,7 +83,6 @@ import net.sourceforge.pmd.util.IOUtil;
  * </ul>
  */
 public class PMDConfiguration extends AbstractConfiguration {
-
     // General behavior options
     private String suppressMarker = PMD.SUPPRESS_MARKER;
     private int threads = Runtime.getRuntime().availableProcessors();
@@ -93,6 +95,7 @@ public class PMDConfiguration extends AbstractConfiguration {
     private String inputPaths;
     private String inputUri;
     private String inputFilePath;
+    private String ignoreFilePath;
     private boolean ruleSetFactoryCompatibilityEnabled = true;
 
     // Reporting options
@@ -105,7 +108,8 @@ public class PMDConfiguration extends AbstractConfiguration {
 
     private boolean stressTest;
     private boolean benchmark;
-    private AnalysisCache analysisCache;
+    private AnalysisCache analysisCache = new NoopAnalysisCache();
+    private boolean ignoreIncrementalAnalysis;
 
     /**
      * Get the suppress marker. This is the source level marker used to indicate
@@ -315,6 +319,10 @@ public class PMDConfiguration extends AbstractConfiguration {
         return inputFilePath;
     }
 
+    public String getIgnoreFilePath() {
+        return ignoreFilePath;
+    }
+
     /**
      * The input file path points to a single file, which contains a
      * comma-separated list of source file names to process.
@@ -324,6 +332,17 @@ public class PMDConfiguration extends AbstractConfiguration {
      */
     public void setInputFilePath(String inputFilePath) {
         this.inputFilePath = inputFilePath;
+    }
+
+    /**
+     * The input file path points to a single file, which contains a
+     * comma-separated list of source file names to ignore.
+     *
+     * @param ignoreFilePath
+     *            path to the file
+     */
+    public void setIgnoreFilePath(String ignoreFilePath) {
+        this.ignoreFilePath = ignoreFilePath;
     }
 
     /**
@@ -386,8 +405,11 @@ public class PMDConfiguration extends AbstractConfiguration {
     public Renderer createRenderer(boolean withReportWriter) {
         Renderer renderer = RendererFactory.createRenderer(reportFormat, reportProperties);
         renderer.setShowSuppressedViolations(showSuppressedViolations);
+        if (reportShortNames && inputPaths != null) {
+            renderer.setUseShortNames(Arrays.asList(inputPaths.split(",")));
+        }
         if (withReportWriter) {
-            renderer.setWriter(IOUtil.createWriter(reportFile));
+            renderer.setReportFile(reportFile);
         }
         return renderer;
     }
@@ -552,8 +574,7 @@ public class PMDConfiguration extends AbstractConfiguration {
     /**
      * Sets the rule set factory compatibility feature enabled/disabled.
      *
-     * @param ruleSetFactoryCompatibilityEnabled
-     *            <code>true</code> if the feature should be enabled
+     * @param ruleSetFactoryCompatibilityEnabled {@code true} if the feature should be enabled
      *
      * @see RuleSetFactoryCompatibility
      */
@@ -563,43 +584,66 @@ public class PMDConfiguration extends AbstractConfiguration {
 
     /**
      * Retrieves the currently used analysis cache. Will never be null.
-     * 
+     *
      * @return The currently used analysis cache. Never null.
      */
     public AnalysisCache getAnalysisCache() {
         // Make sure we are not null
-        if (analysisCache == null) {
-            setAnalysisCache(null);
+        if (analysisCache == null || isIgnoreIncrementalAnalysis() && !(analysisCache instanceof NoopAnalysisCache)) {
+            // sets a noop cache
+            setAnalysisCache(new NoopAnalysisCache());
         }
 
         return analysisCache;
     }
-    
+
     /**
      * Sets the analysis cache to be used. Setting a
-     * value of <code>null</code> will cause a Noop AnalysisCache to be used.
-     * 
+     * value of {@code null} will cause a Noop AnalysisCache to be used.
+     * If incremental analysis was explicitly disabled ({@link #isIgnoreIncrementalAnalysis()}),
+     * then this method is a noop.
+     *
      * @param cache The analysis cache to be used.
      */
     public void setAnalysisCache(final AnalysisCache cache) {
-        if (cache == null) {
-            analysisCache = new NoopAnalysisCache();
-        } else {
-            analysisCache = cache;
-        }
+        // the doc says it's a noop if incremental analysis was disabled,
+        // but it's actually the getter that enforces that
+        this.analysisCache = cache == null ? new NoopAnalysisCache() : cache;
     }
 
     /**
      * Sets the location of the analysis cache to be used. This will automatically configure
      * and appropriate AnalysisCache implementation.
-     * 
+     *
      * @param cacheLocation The location of the analysis cache to be used.
      */
     public void setAnalysisCacheLocation(final String cacheLocation) {
-        if (cacheLocation == null) {
-            setAnalysisCache(null);
-        } else {
-            setAnalysisCache(new FileAnalysisCache(new File(cacheLocation)));
-        }
+        setAnalysisCache(cacheLocation == null
+                                 ? new NoopAnalysisCache()
+                                 : new FileAnalysisCache(new File(cacheLocation)));
+    }
+
+
+    /**
+     * Sets whether the user has explicitly disabled incremental analysis or not.
+     * If so, incremental analysis is not used, and all suggestions to use it are
+     * disabled. The analysis cached location is ignored, even if it's specified.
+     *
+     * @param noCache Whether to ignore incremental analysis or not
+     */
+    public void setIgnoreIncrementalAnalysis(boolean noCache) {
+        // see #getAnalysisCache for the implementation.
+        this.ignoreIncrementalAnalysis = noCache;
+    }
+
+
+    /**
+     * Returns whether incremental analysis was explicitly disabled by the user
+     * or not.
+     *
+     * @return {@code true} if incremental analysis is explicitly disabled
+     */
+    public boolean isIgnoreIncrementalAnalysis() {
+        return ignoreIncrementalAnalysis;
     }
 }

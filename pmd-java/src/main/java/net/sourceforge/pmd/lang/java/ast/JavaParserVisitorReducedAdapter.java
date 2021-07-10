@@ -5,10 +5,13 @@
 package net.sourceforge.pmd.lang.java.ast;
 
 /**
- * Visitor adapter with convenient visit methods to e.g. treat contructors and methods the same.
+ * Visitor adapter with convenient visit methods to e.g. treat constructors and methods the same.
  *
  * @author Clément Fournier
+ * @deprecated The functionality of this adapter will be moved into the base java visitor, so this class will
+ *             go away with PMD 7.
  */
+@Deprecated
 public class JavaParserVisitorReducedAdapter extends JavaParserVisitorAdapter {
 
     @Override
@@ -25,6 +28,12 @@ public class JavaParserVisitorReducedAdapter extends JavaParserVisitorAdapter {
 
     @Override
     public Object visit(ASTEnumDeclaration node, Object data) {
+        return visit((ASTAnyTypeDeclaration) node, data);
+    }
+
+
+    @Override
+    public Object visit(ASTRecordDeclaration node, Object data) {
         return visit((ASTAnyTypeDeclaration) node, data);
     }
 
@@ -47,6 +56,17 @@ public class JavaParserVisitorReducedAdapter extends JavaParserVisitorAdapter {
 
 
     public Object visit(ASTMethodOrConstructorDeclaration node, Object data) {
+        return visit((MethodLikeNode) node, data);
+    }
+
+
+    @Override
+    public Object visit(ASTLambdaExpression node, Object data) {
+        return visit((MethodLikeNode) node, data);
+    }
+
+
+    public Object visit(MethodLikeNode node, Object data) {
         return visit((JavaNode) node, data);
     }
 

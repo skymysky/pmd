@@ -35,22 +35,21 @@ import net.sourceforge.pmd.lang.java.ast.ASTThrowStatement;
 import net.sourceforge.pmd.lang.java.ast.ASTWhileStatement;
 import net.sourceforge.pmd.lang.java.ast.JavaParserControllessVisitorAdapter;
 
+
 /**
  * Default visitor for the calculation of Ncss.
  *
  * @author Clément Fournier
  * @see net.sourceforge.pmd.lang.java.metrics.impl.NcssMetric
+ *
+ * @deprecated Visitor decorators are deprecated because they lead to fragile code.
+ *
  */
+@Deprecated
 public class NcssBaseVisitor extends JavaParserControllessVisitorAdapter {
 
     /** Instance. */
     public static final NcssBaseVisitor INSTANCE = new NcssBaseVisitor();
-
-
-    protected NcssBaseVisitor() {
-
-    }
-
 
     @Override
     public Object visit(ASTClassOrInterfaceDeclaration node, Object data) {
@@ -98,7 +97,7 @@ public class NcssBaseVisitor extends JavaParserControllessVisitorAdapter {
     public Object visit(ASTLocalVariableDeclaration node, Object data) {
 
         // doesn't count variable declared inside a for initializer
-        if (!(node.jjtGetParent() instanceof ASTForInit)) {
+        if (!(node.getParent() instanceof ASTForInit)) {
             ((MutableInt) data).increment();
         }
         return data;
@@ -132,7 +131,7 @@ public class NcssBaseVisitor extends JavaParserControllessVisitorAdapter {
 
     @Override
     public Object visit(ASTStatementExpression node, Object data) {
-        if (!(node.jjtGetParent().jjtGetParent() instanceof ASTForUpdate)) {
+        if (!(node.getParent().getParent() instanceof ASTForUpdate)) {
             ((MutableInt) data).increment();
         }
         return data;

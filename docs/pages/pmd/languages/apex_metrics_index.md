@@ -1,6 +1,6 @@
 ---
 title:  Index of Apex code metrics
-tags: [customizing]
+tags: [extending, metrics]
 summary: "Index of the code metrics available out of the box to Apex rule developers."
 last_updated: July 20, 2017
 permalink: pmd_apex_metrics_index.html
@@ -8,6 +8,20 @@ toc:
   minimumHeaders: 8
 ---
 # Index of code metrics
+
+## Cognitive Complexity (COGNITIVE)
+
+*Operation metric.* Can be calculated on any non-abstract operation.
+
+*Class metric.* Can be computed on classes and enums - it's just the sum of all method's cogntive complexities.
+
+### Description
+
+See the corresponding Java metric [Cognitive Complexity](pmd_java_metrics_index.html#cognitive-complexity-cognitive_complexity) for a general description.
+
+The rule {% rule apex/design/CognitiveComplexity %} by default reports methods with a complexity of 15 or more
+and classes the have a total complexity (sum of all methods) of 50 or more.
+These reported methods should be broken down into less complex components.
 
 ## Cyclomatic Complexity (CYCLO) 
 

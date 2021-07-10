@@ -10,11 +10,14 @@ package net.sourceforge.pmd.util.filter;
  *
  * @param <T>
  *            The underlying type on which the filter applies.
+ * @deprecated See {@link Filter}
  */
+@Deprecated
 public abstract class AbstractDelegateFilter<T> implements Filter<T> {
     protected Filter<T> filter;
 
     public AbstractDelegateFilter() {
+        // default constructor
     }
 
     public AbstractDelegateFilter(Filter<T> filter) {

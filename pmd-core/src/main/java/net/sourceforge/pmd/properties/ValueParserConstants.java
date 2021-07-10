@@ -14,16 +14,25 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 
+import net.sourceforge.pmd.annotation.InternalApi;
 import net.sourceforge.pmd.util.ClassUtil;
 
 
 /**
+ * This class will be completely scrapped with 7.0.0. It only hid away the syntactic
+ * overhead caused by the lack of lambdas in Java 7.
+ *
  * @author Clément Fournier
  * @since 6.0.0
+ * @deprecated Was internal API
  */
+@Deprecated
+@InternalApi
 public final class ValueParserConstants {
 
 
@@ -31,7 +40,7 @@ public final class ValueParserConstants {
     static final ValueParser<Method> METHOD_PARSER = new ValueParser<Method>() {
         @Override
         public Method valueOf(String value) throws IllegalArgumentException {
-            return methodFrom(value, CLASS_METHOD_DELIMITER, METHOD_ARG_DELIMITER);
+            return methodFrom(StringUtils.trim(value), CLASS_METHOD_DELIMITER, METHOD_ARG_DELIMITER);
         }
 
 
@@ -149,21 +158,21 @@ public final class ValueParserConstants {
     static final ValueParser<String> STRING_PARSER = new ValueParser<String>() {
         @Override
         public String valueOf(String value) {
-            return value;
+            return StringUtils.trim(value);
         }
     };
     /** Extracts integers. */
     static final ValueParser<Integer> INTEGER_PARSER = new ValueParser<Integer>() {
         @Override
         public Integer valueOf(String value) {
-            return Integer.valueOf(value);
+            return Integer.valueOf(StringUtils.trim(value));
         }
     };
     /** Extracts booleans. */
     static final ValueParser<Boolean> BOOLEAN_PARSER = new ValueParser<Boolean>() {
         @Override
         public Boolean valueOf(String value) {
-            return Boolean.valueOf(value);
+            return Boolean.valueOf(StringUtils.trim(value));
         }
     };
     /** Extracts floats. */
@@ -177,7 +186,7 @@ public final class ValueParserConstants {
     static final ValueParser<Long> LONG_PARSER = new ValueParser<Long>() {
         @Override
         public Long valueOf(String value) {
-            return Long.valueOf(value);
+            return Long.valueOf(StringUtils.trim(value));
         }
     };
     /** Extracts doubles. */
@@ -191,7 +200,15 @@ public final class ValueParserConstants {
     static final ValueParser<File> FILE_PARSER = new ValueParser<File>() {
         @Override
         public File valueOf(String value) throws IllegalArgumentException {
-            return new File(value);
+            return new File(StringUtils.trim(value));
+        }
+    };
+
+    /** Compiles a regex. */
+    static final ValueParser<Pattern> REGEX_PARSER = new ValueParser<Pattern>() {
+        @Override
+        public Pattern valueOf(String value) throws IllegalArgumentException {
+            return Pattern.compile(value);
         }
     };
 
@@ -199,17 +216,19 @@ public final class ValueParserConstants {
     static final ValueParser<Class> CLASS_PARSER = new ValueParser<Class>() {
         @Override
         public Class valueOf(String value) throws IllegalArgumentException {
-            if (StringUtils.isBlank(value)) {
+            String className = StringUtils.trimToNull(value);
+
+            if (className == null) {
                 return null;
             }
 
-            Class<?> cls = ClassUtil.getTypeFor(value);
+            Class<?> cls = ClassUtil.getTypeFor(className);
             if (cls != null) {
                 return cls;
             }
 
             try {
-                return Class.forName(value);
+                return Class.forName(className);
             } catch (ClassNotFoundException ex) {
                 throw new IllegalArgumentException(value);
             }
@@ -219,6 +238,25 @@ public final class ValueParserConstants {
 
     private ValueParserConstants() {
 
+    }
+
+
+    static <T> ValueParser<T> enumerationParser(final Map<String, T> mappings) {
+
+        if (mappings.containsValue(null)) {
+            throw new IllegalArgumentException("Map may not contain entries with null values");
+        }
+
+        return new ValueParser<T>() {
+            @Override
+            public T valueOf(String value) throws IllegalArgumentException {
+                String trimmedValue = StringUtils.trim(value);
+                if (!mappings.containsKey(trimmedValue)) {
+                    throw new IllegalArgumentException("Value " + value + " was not in the set " + mappings.keySet());
+                }
+                return mappings.get(trimmedValue);
+            }
+        };
     }
 
 

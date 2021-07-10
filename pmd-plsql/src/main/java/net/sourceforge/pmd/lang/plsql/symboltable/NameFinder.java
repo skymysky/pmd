@@ -14,7 +14,6 @@ import net.sourceforge.pmd.lang.plsql.ast.ASTName;
 import net.sourceforge.pmd.lang.plsql.ast.ASTPrimaryExpression;
 import net.sourceforge.pmd.lang.plsql.ast.ASTPrimaryPrefix;
 import net.sourceforge.pmd.lang.plsql.ast.ASTPrimarySuffix;
-//import net.sourceforge.pmd.lang.plsql.ast.ASTMemberSelector;
 import net.sourceforge.pmd.lang.plsql.ast.PLSQLNode;
 
 public class NameFinder {
@@ -22,7 +21,7 @@ public class NameFinder {
     private List<PLSQLNameOccurrence> names = new ArrayList<>();
 
     public NameFinder(ASTPrimaryExpression node) {
-        Node simpleNode = node.jjtGetChild(0);
+        Node simpleNode = node.getChild(0);
         if (simpleNode instanceof ASTPrimaryPrefix) {
             ASTPrimaryPrefix prefix = (ASTPrimaryPrefix) simpleNode;
             // if (prefix.usesSuperModifier()) {
@@ -32,8 +31,8 @@ public class NameFinder {
                 add(new PLSQLNameOccurrence(prefix, "this"));
             }
         }
-        for (int i = 0; i < node.jjtGetNumChildren(); i++) {
-            checkForNameChild(node.jjtGetChild(i));
+        for (int i = 0; i < node.getNumChildren(); i++) {
+            checkForNameChild(node.getChild(i));
         }
     }
 
@@ -45,8 +44,8 @@ public class NameFinder {
         if (node.getImage() != null) {
             add(new PLSQLNameOccurrence((PLSQLNode) node, node.getImage()));
         }
-        if (node.jjtGetNumChildren() > 0 && node.jjtGetChild(0) instanceof ASTName) {
-            ASTName grandchild = (ASTName) node.jjtGetChild(0);
+        if (node.getNumChildren() > 0 && node.getChild(0) instanceof ASTName) {
+            ASTName grandchild = (ASTName) node.getChild(0);
             for (StringTokenizer st = new StringTokenizer(grandchild.getImage(), "."); st.hasMoreTokens();) {
                 add(new PLSQLNameOccurrence(grandchild, st.nextToken()));
             }
@@ -56,13 +55,13 @@ public class NameFinder {
             if (suffix.isArguments()) {
                 PLSQLNameOccurrence occurrence = names.get(names.size() - 1);
                 occurrence.setIsMethodOrConstructorInvocation();
-                ASTArguments args = (ASTArguments) ((ASTPrimarySuffix) node).jjtGetChild(0);
+                ASTArguments args = (ASTArguments) ((ASTPrimarySuffix) node).getChild(0);
                 occurrence.setArgumentCount(args.getArgumentCount());
-            } // else if (suffix.jjtGetNumChildren() == 1
-            // && suffix.jjtGetChild(0) instanceof ASTMemberSelector)
+            } // else if (suffix.getNumChildren() == 1
+            // && suffix.getChild(0) instanceof ASTMemberSelector)
             // {
-            // add(new NameOccurrence((SimpleNode)suffix.jjtGetChild(0),
-            // suffix.jjtGetChild(0).getImage()));
+            // add(new NameOccurrence((SimpleNode)suffix.getChild(0),
+            // suffix.getChild(0).getImage()));
             // }
         }
     }

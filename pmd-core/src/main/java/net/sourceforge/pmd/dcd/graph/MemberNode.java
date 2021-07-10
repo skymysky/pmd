@@ -9,9 +9,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import net.sourceforge.pmd.dcd.DCD;
+
 /**
  * Represents a Class Member in a UsageGraph.
+ * @deprecated See {@link DCD}
  */
+@Deprecated
 public abstract class MemberNode<S extends MemberNode<S, T>, T extends Member>
     implements NodeVisitorAcceptor, Comparable<S> {
     protected final ClassNode classNode;
@@ -23,8 +27,6 @@ public abstract class MemberNode<S extends MemberNode<S, T>, T extends Member>
     private List<MemberNode> uses;
 
     private List<MemberNode> users;
-
-    private Object decoration;
 
     public MemberNode(ClassNode classNode, String name, String desc) {
         this.classNode = classNode;
@@ -81,7 +83,7 @@ public abstract class MemberNode<S extends MemberNode<S, T>, T extends Member>
 
     @Override
     public String toString() {
-        return name + " " + desc;
+        return name + ' ' + desc;
     }
 
     public String toStringLong() {
@@ -89,6 +91,7 @@ public abstract class MemberNode<S extends MemberNode<S, T>, T extends Member>
     }
 
     @SuppressWarnings("PMD.SuspiciousEqualsMethodName")
+    @Deprecated // To be removed with PMD 7.0.0
     public boolean equals(S that) {
         return equals(that.name, that.desc);
     }

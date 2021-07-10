@@ -3,13 +3,14 @@
 <ruleset name="Documentation"
     xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
     <description>
 Rules that are related to code documentation.
     </description>
 
     <rule name="CommentContent"
+          language="java"
           since="5.0"
           message="Invalid words or phrases found"
           class="net.sourceforge.pmd.lang.java.rule.documentation.CommentContentRule"
@@ -26,18 +27,19 @@ A rule for the politically correct... we don't want to offend anyone.
     </rule>
 
     <rule name="CommentRequired"
+          language="java"
           since="5.1"
           message="Comment is required"
           class="net.sourceforge.pmd.lang.java.rule.documentation.CommentRequiredRule"
           externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_documentation.html#commentrequired">
         <description>
-Denotes whether comments are required (or unwanted) for specific language elements.
+Denotes whether javadoc (formal) comments are required (or unwanted) for specific language elements.
         </description>
         <priority>3</priority>
         <example>
 <![CDATA[
 /**
-* 
+*
 *
 * @author Jon Doe
 */
@@ -46,6 +48,7 @@ Denotes whether comments are required (or unwanted) for specific language elemen
     </rule>
 
     <rule name="CommentSize"
+          language="java"
           since="5.0"
           message="Comment is too large"
           class="net.sourceforge.pmd.lang.java.rule.documentation.CommentSizeRule"
@@ -91,12 +94,15 @@ and unintentional empty constructors.
         </description>
         <priority>3</priority>
         <properties>
+            <property name="version" value="2.0"/>
             <property name="xpath">
                 <value>
 <![CDATA[
-//ConstructorDeclaration[@Private='false']
-                        [count(BlockStatement) = 0 and ($ignoreExplicitConstructorInvocation = 'true' or not(ExplicitConstructorInvocation)) and @containsComment = 'false']
-                        [not(../Annotation/MarkerAnnotation/Name[typeof(@Image, 'javax.inject.Inject', 'Inject')])]
+//ConstructorDeclaration[@Private= false()]
+                        [@containsComment = false()]
+                        [not(BlockStatement)]
+                        [$ignoreExplicitConstructorInvocation = true() or not(ExplicitConstructorInvocation)]
+                        [not(../Annotation/MarkerAnnotation/Name[pmd-java:typeIs('javax.inject.Inject')])]
 ]]>
                 </value>
             </property>
@@ -125,10 +131,11 @@ empty methods.
         </description>
         <priority>3</priority>
         <properties>
+            <property name="version" value="2.0"/>
             <property name="xpath">
                 <value>
 <![CDATA[
-//MethodDeclaration/Block[count(BlockStatement) = 0 and @containsComment = 'false']
+//MethodDeclaration/Block[count(BlockStatement) = 0 and @containsComment = false()]
 ]]>
                 </value>
             </property>

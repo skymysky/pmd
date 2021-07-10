@@ -75,8 +75,8 @@ public class UselessOperationOnImmutableRule extends AbstractJavaRule {
             // see JUnit test, case 6. Changing to Node below, revisit when
             // getUsages is fixed
             Node sn = no.getLocation();
-            Node primaryExpression = sn.jjtGetParent().jjtGetParent();
-            Class<? extends Node> parentClass = primaryExpression.jjtGetParent().getClass();
+            Node primaryExpression = sn.getParent().getParent();
+            Class<? extends Node> parentClass = primaryExpression.getParent().getClass();
             if (parentClass.equals(ASTStatementExpression.class)) {
                 String methodCall = sn.getImage().substring(variableName.length());
                 ASTType nodeType = node.getTypeNode();
@@ -100,8 +100,10 @@ public class UselessOperationOnImmutableRule extends AbstractJavaRule {
      */
     private ASTVariableDeclaratorId getDeclaration(ASTLocalVariableDeclaration node) {
         ASTType type = node.getTypeNode();
-        if (MAP_CLASSES.keySet().contains(type.getTypeImage())) {
-            return node.getFirstDescendantOfType(ASTVariableDeclaratorId.class);
+        if (type != null) {
+            if (MAP_CLASSES.keySet().contains(type.getTypeImage())) {
+                return node.getFirstDescendantOfType(ASTVariableDeclaratorId.class);
+            }
         }
         return null;
     }

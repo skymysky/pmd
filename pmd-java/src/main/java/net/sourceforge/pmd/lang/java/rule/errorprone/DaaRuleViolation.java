@@ -6,6 +6,7 @@ package net.sourceforge.pmd.lang.java.rule.errorprone;
 
 import net.sourceforge.pmd.Rule;
 import net.sourceforge.pmd.RuleContext;
+import net.sourceforge.pmd.RuleViolation;
 import net.sourceforge.pmd.lang.ast.Node;
 import net.sourceforge.pmd.lang.java.ast.JavaNode;
 import net.sourceforge.pmd.lang.java.rule.JavaRuleViolation;
@@ -13,10 +14,12 @@ import net.sourceforge.pmd.lang.java.rule.JavaRuleViolation;
 /**
  * The RuleViolation is extended by the VariableName. The VariableName is
  * required for showing what variable produces the UR DD or DU anomaly.
- * 
+ *
  * @author Sven Jacob
  * @author Brian Remedios
+ * @deprecated See {@link RuleViolation}
  */
+@Deprecated
 public class DaaRuleViolation extends JavaRuleViolation {
 
     private final String variableName;
@@ -30,6 +33,7 @@ public class DaaRuleViolation extends JavaRuleViolation {
         this.type = type;
     }
 
+    @Override
     public String getVariableName() {
         return variableName;
     }

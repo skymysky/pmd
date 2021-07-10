@@ -4,21 +4,23 @@
 
 package net.sourceforge.pmd.lang.java.ast;
 
+import net.sourceforge.pmd.annotation.Experimental;
+import net.sourceforge.pmd.annotation.InternalApi;
+
 /**
  * Decorates a control less visitor. This must be wrapped into a {@link JavaParserDecoratedVisitor} to work properly.
  *
  * @author Clément Fournier
  * @since 6.0.0
+ * @deprecated Visitor decorators are deprecated because they lead to fragile code.
  */
+@Deprecated
 public class JavaParserVisitorDecorator implements JavaParserControllessVisitor {
 
     private JavaParserVisitor visitor;
 
-
-    public JavaParserVisitorDecorator() {
-    }
-
-
+    @InternalApi
+    @Deprecated
     public void setBase(JavaParserControllessVisitor base) {
         visitor = base;
     }
@@ -204,13 +206,21 @@ public class JavaParserVisitorDecorator implements JavaParserControllessVisitor 
     }
 
 
+    /**
+     * @deprecated Will be removed in 7.0.0. Use {@link ASTShiftExpression#getOperator()}
+     */
     @Override
+    @Deprecated
     public Object visit(ASTRUNSIGNEDSHIFT node, Object data) {
         return visitor.visit(node, data);
     }
 
 
+    /**
+     * @deprecated Will be removed in 7.0.0. Use {@link ASTShiftExpression#getOperator()}
+     */
     @Override
+    @Deprecated
     public Object visit(ASTRSIGNEDSHIFT node, Object data) {
         return visitor.visit(node, data);
     }
@@ -722,6 +732,67 @@ public class JavaParserVisitorDecorator implements JavaParserControllessVisitor 
 
     @Override
     public Object visit(ASTModuleName node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTSwitchExpression node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTSwitchLabeledBlock node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTSwitchLabeledExpression node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTSwitchLabeledThrowStatement node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTYieldStatement node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTTypePattern node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTRecordDeclaration node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTRecordComponentList node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTRecordComponent node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTRecordBody node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    public Object visit(ASTCompactConstructorDeclaration node, Object data) {
+        return visitor.visit(node, data);
+    }
+
+    @Override
+    @Experimental
+    public Object visit(ASTPermitsList node, Object data) {
         return visitor.visit(node, data);
     }
 }

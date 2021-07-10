@@ -12,6 +12,11 @@ import java.util.List;
 
 import net.sourceforge.pmd.lang.ast.Node;
 
+/**
+ *
+ * @deprecated This class will be removed with PMD 7. The rule designer is a better way to inspect nodes.
+ */
+@Deprecated
 public class DumpFacade extends VfParserVisitorAdapter {
 
     private PrintWriter writer;
@@ -47,7 +52,7 @@ public class DumpFacade extends VfParserVisitorAdapter {
         writer.print(prefix);
 
         // 2) JJT Name of the Node
-        writer.print(node.toString());
+        writer.print(node.getXPathNodeName());
 
         //
         // If there are any additional details, then:

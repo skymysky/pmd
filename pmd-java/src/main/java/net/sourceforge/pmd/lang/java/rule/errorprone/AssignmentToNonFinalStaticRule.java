@@ -4,6 +4,7 @@
 
 package net.sourceforge.pmd.lang.java.rule.errorprone;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -22,26 +23,27 @@ import net.sourceforge.pmd.lang.symboltable.NameOccurrence;
  */
 public class AssignmentToNonFinalStaticRule extends AbstractJavaRule {
 
+    @Override
     public Object visit(ASTClassOrInterfaceDeclaration node, Object data) {
         Map<VariableNameDeclaration, List<NameOccurrence>> vars = node.getScope()
                 .getDeclarations(VariableNameDeclaration.class);
         for (Map.Entry<VariableNameDeclaration, List<NameOccurrence>> entry : vars.entrySet()) {
             VariableNameDeclaration decl = entry.getKey();
-            AccessNode accessNodeParent = (AccessNode) decl.getAccessNodeParent();
+            AccessNode accessNodeParent = decl.getAccessNodeParent();
             if (!accessNodeParent.isStatic() || accessNodeParent.isFinal()) {
                 continue;
             }
 
-            if (initializedInConstructor(entry.getValue())) {
-                addViolation(data, decl.getNode(), decl.getImage());
+            final List<Node> locations = initializedInConstructor(entry.getValue());
+            for (final Node location : locations) {
+                addViolation(data, location, decl.getImage());
             }
         }
         return super.visit(node, data);
     }
 
-    private boolean initializedInConstructor(List<NameOccurrence> usages) {
-        boolean initInConstructor = false;
-
+    private List<Node> initializedInConstructor(List<NameOccurrence> usages) {
+        final List<Node> unsafeAssignments = new ArrayList<>();
         for (NameOccurrence occ : usages) {
             // specifically omitting prefix and postfix operators as there are
             // legitimate usages of these with static fields, e.g. typesafe enum pattern.
@@ -49,12 +51,12 @@ public class AssignmentToNonFinalStaticRule extends AbstractJavaRule {
                 Node node = occ.getLocation();
                 Node constructor = node.getFirstParentOfType(ASTConstructorDeclaration.class);
                 if (constructor != null) {
-                    initInConstructor = true;
+                    unsafeAssignments.add(node);
                 }
             }
         }
 
-        return initInConstructor;
+        return unsafeAssignments;
     }
 
 }
